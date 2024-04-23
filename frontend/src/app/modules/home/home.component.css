@@ -1,0 +1,36 @@
+.headerContainer {
+    padding: 300px 0;
+    margin: 0 0 40px 0;
+    width: auto;
+    height: auto;
+    background-image: url('/assets/imgs/header.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
+
+.grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.bentoBox {
+    flex-grow: 1;
+    align-self: stretch;
+    width: 100%;
+    max-width: 400px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background-color: rgba(221, 221, 220, 0.50);
+    border: 1px solid rgba(221, 221, 220, 0.50);
+    border-radius: 8px;
+    box-shadow: 0 5px 20px #eeeeee98;
+}
+
+.libroImgContainer {
+    margin-bottom: -70px;
+}

@@ -1,0 +1,44 @@
+.headerContainer {
+    padding: 300px 0;
+    margin: 0 0 40px 0;
+    width: auto;
+    height: auto;
+    background-image: url('/assets/imgs/header.png');
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
+}
+
+
+.confCompteContainer {
+    width: 45% !important;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 40px;
+    width: 100%;
+    height: auto;
+    align-items: start;
+    justify-content: space-around;
+    background-color: #C6EDCC;
+    border-radius: 10px;
+    box-shadow: 1px 1px 8px rgba(0, 0, 0, 0.3);
+}
+
+.edicioCompteContainer {
+    width: 100%;
+    display: flex;
+    padding: 20px;
+    margin: 20px 0 0 0;
+    flex-direction: column;
+    gap: 20px;
+    justify-content: space-around;
+    align-items: stretch;
+    border-radius: 10px;
+    background-color: rgba(251, 255, 251, 0.7);
+}
+
+hr {
+    margin: 20px 0;
+    border: 1px solid #F5F5F5;
+}

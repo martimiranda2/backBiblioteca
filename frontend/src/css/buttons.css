@@ -1,0 +1,93 @@
+
+/* BOTÓN PRINCIPAL (fill) */
+.p-button-fill {
+    background-color: #59B468;
+    border: 1px solid #59B468;
+    border-radius: 14px;
+    color: white;
+    transition-duration: 1s;
+}
+
+.p-button-fill:hover {
+    transition-duration: 1s;
+    background-color: #338240;
+    border-color: #338240;
+}
+
+/* BOTÓN PRINCIPAL REDONDEADO (fill-rounded) */
+.p-button-fill-rounded {
+    background-color: #59B468;
+    border: 1px solid #59B468;
+    border-radius: 100px;
+    color: white;
+    transition-duration: 1s;
+}
+
+.p-button-fill-rounded:hover {
+    transition-duration: 1s;
+    background-color: #338240;
+    border-color: #338240;
+    
+}
+
+/* BOTÓN SECUNDARIO (min)*/
+.p-button-min {
+    background-color: white;
+    border: 1px solid #59B468;
+    border-radius: 100px;
+    color: #59B468;
+    transition-duration: 1s;
+}
+
+.p-button-min:hover {
+    transition-duration: 1s;
+    border-color: #338240;
+    color: #338240;
+}
+
+
+/* BOTÓN QUE SOLO CONTIENE ICONO (icon) */
+.p-button-icon {
+    padding: 14px;
+    background-color: #59B468;
+    border: 1px solid #59B468;
+    border-radius: 100px;
+    color: white;
+    transition-duration: 1s;
+}
+
+.p-button-icon:hover {
+    transition-duration: 1s;
+    background-color: #338240;
+    border-color: #338240;
+}
+
+
+/* BOTONES ROJOS */
+.p-button-danger {
+    background-color: #e02222;
+    border: 1px solid #e02222;
+    border-radius: 14px;
+    color: white;
+    transition-duration: 1s;
+}
+
+.p-button-danger:hover {
+    transition-duration: 1s;
+    background-color: #E03131;
+    border-color: #E03131;
+}
+
+.p-button-dangeroutlined {
+    background-color: white;
+    border: 1px solid #e02222;
+    border-radius: 14px;
+    color: #e02222;
+    transition-duration: 1s;
+}
+
+.p-button-dangeroutlined:hover {
+    transition-duration: 1s;
+    border-color: #E03131;
+    color: #E03131;
+}

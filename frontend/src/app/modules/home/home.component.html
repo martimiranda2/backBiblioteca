@@ -1,0 +1,39 @@
+<div class="homeContainer">
+
+    <div class="headerContainer flex flex-col items-center justify-center text-center">
+        <header class="w-4/5">
+            <div class="flex flex-col items-center justify-center ">
+                <h1>BIBLIOTECA IES ESTEVE TERRADAS I ILLA</h1>
+                <p class="text-white font-semibold">Text de subtítol</p>
+            </div>
+        </header>
+    </div>
+
+    <div class="grid grid-cols-2 px-10 mb-40 justify-center gap-x-20">
+        <div class="bentoBox">
+            <div class="flex flex-col justify-center items-center">
+                
+                <div class="items-start">
+                    <h2>Cercar catàleg</h2>
+                    <p>Troba els teus llibres favorits! Recorda que si no el trobes, pots fer una petició.</p>
+
+                    <div class="flex flex-row gap-x-2 mt-4">
+                        <div class="card flex justify-content-center">
+                            <p-autoComplete [(ngModel)]="selectedItem" (completeMethod)="search($event)"></p-autoComplete>
+                        </div>
+                        <p-button severity="icon">
+                            <i class="pi pi-search"></i>
+                        </p-button>
+                    </div>
+                </div>
+
+                <div class="libroImgContainer">
+                    <img src="/assets/imgs/libros3D.png" alt="">
+                </div>
+            </div>
+        </div>
+
+        <div class="bentoBox">
+                <app-login></app-login>
+        </div>
+</div>

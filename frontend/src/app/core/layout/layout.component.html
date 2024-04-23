@@ -1,0 +1,11 @@
+<body class="content relative">
+    <router-outlet></router-outlet>
+    <p-dialog [header]="header" [(visible)]="isVisible" [position]="'top'" [style]="{ width: '50vw' }" (onHide)="_dialogService.hideDialog()">
+        <p>{{ message }}</p>
+        <p-footer>
+            <div>
+                <p-button label="Aceptar" (click)="_dialogService.hideDialog()"></p-button>
+            </div>
+        </p-footer>
+    </p-dialog>
+</body>
