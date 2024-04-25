@@ -28,7 +28,7 @@ class UserProfile(models.Model):
     center = models.CharField(max_length=100 , verbose_name="Centre al que pertany")
     cycle = models.CharField(max_length=100 , verbose_name="Curs al que pertany")
     image = models.ImageField(upload_to='user_images/', blank=True, null=True , verbose_name="Imatge de perfil")
-
+    password_changed = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Perfil d'usuari"
