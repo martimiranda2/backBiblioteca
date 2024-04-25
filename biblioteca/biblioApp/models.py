@@ -18,6 +18,7 @@ class Role(models.Model):
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE , verbose_name="Usuari")
     email = models.EmailField(unique=True, verbose_name="Correu electrònic")
+    phone = models.CharField(max_length=20,blank=True, null=True, verbose_name="Telèfon")  
     name = models.CharField(max_length=100 , verbose_name="Nom")
     surname = models.CharField(max_length=100 , verbose_name="Cognom")
     surname2 = models.CharField(max_length=100 , verbose_name="Segon cognom (opcional)", blank=True, null=True)
@@ -141,7 +142,7 @@ class Loan(models.Model): #PRESTEC
     user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, verbose_name="Usuari")
     copy = models.ForeignKey(ItemCopy, on_delete=models.CASCADE, verbose_name="Exemplar")
     loan_date = models.DateField(auto_now_add=True, verbose_name="Data de la solicitud del prèstec")
-    return_date = models.DateField(null=True, blank=True, verbose_name="Data del final del prèstec")
+    return_date = models.DateField(verbose_name="Data del final del prèstec")
 
 
     class Meta:

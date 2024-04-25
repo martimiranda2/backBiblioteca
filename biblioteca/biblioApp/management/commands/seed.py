@@ -1,6 +1,7 @@
 
 
-import random
+import random,datetime
+from datetime import datetime, timedelta
 from faker import Faker
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
@@ -51,11 +52,15 @@ def create_users(num_users=100):
         surname = fake.last_name()
         name = fake.first_name()
         surname2 = fake.last_name() if random.choice([True, False]) else None
-        username = fake.user_name()
+        while True:
+            username = fake.user_name()
+            if not User.objects.filter(username=username).exists():
+                break
         dni_digits = ''.join([str(random.randint(0, 9)) for _ in range(8)])
         dni_letter = 'TRWAGMYFPDXBNJZSQVHLCKE'[int(dni_digits) % 23]
         dni = dni_digits + dni_letter
         email = fake.unique.email()
+        phone = fake.phone_number()
         password = fake.password()
         center = random.choice(centers)
         cycle = random.choice(cycles)
@@ -65,6 +70,7 @@ def create_users(num_users=100):
             user=user,
             name=name,
             email=email,
+            phone=phone,
             surname=surname,
             surname2=surname2,
             dni=dni,
@@ -165,6 +171,34 @@ def create_item_copies(num_copies=600):
         id_copy = fake.uuid4()
         ItemCopy.objects.create(item=item, status=status, id_copy=id_copy)
 
+def create_loans(num_loans=200):
+    users = UserProfile.objects.all()
+    available_copies = ItemCopy.objects.filter(status='Available')
+
+    if len(users) == 0 or len(available_copies) == 0:
+        print("No hay usuarios o copias disponibles para generar préstamos.")
+        return
+
+    for _ in range(num_loans):
+        user = random.choice(users)
+        copy = random.choice(available_copies)
+
+        loan_date = datetime.now()
+
+        return_date = loan_date + timedelta(days=14)
+
+        loan = Loan.objects.create(
+            user=user,
+            copy=copy,
+            loan_date=loan_date,
+            return_date=return_date
+        )
+
+        copy.status = 'Loaned'
+        copy.save()
+
+
+
 
 def seed():
     if not Role.objects.exists():
@@ -174,6 +208,7 @@ def seed():
     create_cds()
     create_dispositives()
     create_item_copies()
+    create_loans()
 
 
 if __name__ == "__main__":
