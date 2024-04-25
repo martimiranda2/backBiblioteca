@@ -1,6 +1,7 @@
 
 
-import random
+import random,datetime
+from datetime import datetime, timedelta
 from faker import Faker
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
@@ -17,10 +18,19 @@ class Command(BaseCommand):
 
 
     def handle(self, *args, **kwargs):
-        create_item_copies()
+        seed()
 
+def create_rols():
+    roles_data = [
+        {"name": "admin"},
+        {"name": "alumne"},
+        {"name": "profesor"},
+        {"name": "bibliotecari"},
+    ]
+    for role_data in roles_data:
+        Role.objects.create(**role_data)
 
-def create_users(num_users=10):
+def create_users(num_users=100):
     centers = [
     "Institut Escola del Treball de Barcelona",
     "Institut Jaume Balmes de Barcelona",
@@ -36,28 +46,31 @@ def create_users(num_users=10):
 
 
     cycles = ["1ESO","2ESO","3ESO","4ESO","1Bachillerat","2Bachillerat","Cicle Grau Mitjà Gestió administrativa", "Cicle Grau Mitjà Electromecànica de vehicles automòbils", "Cicle Grau Mitjà Mecanització","Cicle Grau Mitjà Manteniment electromecànic", "Cicle Grau Mitjà Sistemes microinformàtics i xarxes","Cicle Grau Superior Assistència a la direcció", "Cicle Grau Superior Administració i finances", "Cicle Grau Superior Automoció","Cicle Grau Superior Programació de la producció en fabricació mecànica","Cicle Grau Superior Mecatrònica industrial","Cicle Grau Superior Gestió de l'aigua","Cicle Grau Superior Desenvolupament d'aplicacions multiplataforma", "Cicle Grau Superior Desenvolupament d'aplicacions web"]
-    roles = Role.objects.all()
+    role = Role.objects.get(name="alumne")
    
     for _ in range(num_users):
         surname = fake.last_name()
         name = fake.first_name()
         surname2 = fake.last_name() if random.choice([True, False]) else None
-        username = fake.user_name()
+        while True:
+            username = fake.user_name()
+            if not User.objects.filter(username=username).exists():
+                break
         dni_digits = ''.join([str(random.randint(0, 9)) for _ in range(8)])
         dni_letter = 'TRWAGMYFPDXBNJZSQVHLCKE'[int(dni_digits) % 23]
         dni = dni_digits + dni_letter
         email = fake.unique.email()
+        phone = fake.phone_number()
         password = fake.password()
-        role = random.choice(roles)
         center = random.choice(centers)
         cycle = random.choice(cycles)
-       
         user = User.objects.create_user(username=username, email=email, password=password)
        
         UserProfile.objects.create(
             user=user,
             name=name,
             email=email,
+            phone=phone,
             surname=surname,
             surname2=surname2,
             dni=dni,
@@ -75,23 +88,14 @@ def create_users(num_users=10):
 
 
 
-def create_books(num_books=20):
-    titles = ["To Kill a Mockingbird", "1984", "The Great Gatsby", "Pride and Prejudice", "Harry Potter and the Philosopher's Stone", "The Catcher in the Rye", "The Hobbit", "Fahrenheit 451", "Animal Farm", "The Lord of the Rings",
-              "Brave New World", "The Catcher in the Rye", "The Fellowship of the Ring", "One Hundred Years of Solitude", "The Hitchhiker's Guide to the Galaxy", "Crime and Punishment", "The Hunger Games", "The Da Vinci Code", "Moby-Dick", "Frankenstein"]
-    authors = ["Harper Lee", "George Orwell", "F. Scott Fitzgerald", "Jane Austen", "J.K. Rowling", "J.D. Salinger", "J.R.R. Tolkien", "Ray Bradbury", "George Orwell", "J.R.R. Tolkien",
-               "Aldous Huxley", "J.D. Salinger", "J.R.R. Tolkien", "Gabriel Garcia Marquez", "Douglas Adams", "Fyodor Dostoevsky", "Suzanne Collins", "Dan Brown", "Herman Melville", "Mary Shelley"]
+def create_books(num_books=100):
+ 
     publishers = ["Penguin Books", "Vintage Books", "Simon & Schuster", "Random House", "HarperCollins"]
    
-    selected_titles = []
-   
     for _ in range(num_books):
-        while True:
-            title = random.choice(titles)
-            if title not in selected_titles:
-                selected_titles.append(title)
-                break
-       
-        author = random.choice(authors)
+
+        title = fake.catch_phrase()
+        author = fake.name()
         publisher = random.choice(publishers)
         edition_date = fake.date_between(start_date='-50y', end_date='today')
         ISBN = fake.isbn10(separator="-")
@@ -115,7 +119,7 @@ def create_books(num_books=20):
 
 
 
-def create_cds(num_cds=20):
+def create_cds(num_cds=100):
     discographies = ["Sony Music Entertainment", "Universal Music Group", "Warner Music Group", "EMI Group Limited", "BMG Rights Management", "Atlantic Records"]
     styles = ["Pop", "Rock", "Hip Hop", "Jazz", "Classical", "Electronic", "R&B", "Reggae", "Country", "Folk"]
    
@@ -159,7 +163,7 @@ def create_dispositives(num_dispositives=10):
 
 
 
-def create_item_copies(num_copies=60):
+def create_item_copies(num_copies=600):
     items = Item.objects.all()
     for _ in range(num_copies):
         item = random.choice(items)
@@ -167,13 +171,44 @@ def create_item_copies(num_copies=60):
         id_copy = fake.uuid4()
         ItemCopy.objects.create(item=item, status=status, id_copy=id_copy)
 
+def create_loans(num_loans=200):
+    users = UserProfile.objects.all()
+    available_copies = ItemCopy.objects.filter(status='Available')
+
+    if len(users) == 0 or len(available_copies) == 0:
+        print("No hay usuarios o copias disponibles para generar préstamos.")
+        return
+
+    for _ in range(num_loans):
+        user = random.choice(users)
+        copy = random.choice(available_copies)
+
+        loan_date = datetime.now()
+
+        return_date = loan_date + timedelta(days=14)
+
+        loan = Loan.objects.create(
+            user=user,
+            copy=copy,
+            loan_date=loan_date,
+            return_date=return_date
+        )
+
+        copy.status = 'Loaned'
+        copy.save()
+
+
+
 
 def seed():
+    if not Role.objects.exists():
+        create_rols()
     create_users()
     create_books()
     create_cds()
     create_dispositives()
     create_item_copies()
+    create_loans()
 
 
 if __name__ == "__main__":

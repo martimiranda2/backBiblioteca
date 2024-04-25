@@ -391,16 +391,22 @@ def new_login(request):
         email = data.get('username')
         password = data.get('password')
 
+        # Authenticate the user
         user = authenticate(request, username=email, password=password)
+        
         if user is not None and user.is_active:
+            # Assuming UserProfile is related to User via a OneToOneField
+            user_profile = UserProfile.objects.get(user=user)
+            
             token = get_token_by_email_and_password(email, password)
-            InfoLog(user, 'new_login', 'Usuario autenticado exitosamente', '/new_login')
+            InfoLog(user_profile, 'new_login', 'Usuario autenticado exitosamente', '/new_login')
             return JsonResponse({'message': 'User Authenticated successfully', 'token': token})
         else:
             WarningLog(None, 'new_login', 'Credenciales incorrectas', '/new_login')
             return JsonResponse({'message': 'Incorrect credentials'}, status=401)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
 
 def register(password, name, surname, surname2, role_id, date_of_birth, center, cycle, dni, email, image=None):
     try:
