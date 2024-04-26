@@ -6,6 +6,7 @@ class Role(models.Model):
     name = models.CharField(max_length=50 , verbose_name="Nom del rol")
 
 
+
     class Meta:
         verbose_name = "Rol"
         verbose_name_plural = "Rols"
@@ -46,7 +47,8 @@ class UserProfile(models.Model):
 class Item(models.Model):
     title = models.CharField(max_length=100 , verbose_name="Títol del item")    
     material_type = models.TextField(max_length=100, verbose_name="Material del que es composa")  
-    signature = models.CharField(max_length=100, verbose_name="Signatura")  
+    signature = models.CharField(max_length=100, verbose_name="Signatura") 
+    loan_available = models.BooleanField(default=True, verbose_name="Item disponible per prestar a alumnes")
 
 
     class Meta:
@@ -135,7 +137,7 @@ class Reservation(models.Model): #RESERVA
 
 
     def __str__(self):
-        return self.name
+        return self.user+" "self.reservation_date
 
 
 class Loan(models.Model): #PRESTEC
@@ -151,7 +153,7 @@ class Loan(models.Model): #PRESTEC
 
 
     def __str__(self):
-        return self.name
+        return self.user+" "+self.return_date
 
 
 class Request(models.Model): #PETICIO
@@ -166,7 +168,7 @@ class Request(models.Model): #PETICIO
 
 
     def __str__(self):
-        return self.name
+        return self.user+" "+self.request_date
 
 
 class Log(models.Model):
@@ -180,7 +182,7 @@ class Log(models.Model):
         verbose_name = "Log"
         verbose_name_plural = "Logs"
     def __str__(self):
-        return self.title
+        return self.user+" "+self.description
 
 
 

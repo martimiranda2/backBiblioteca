@@ -167,7 +167,7 @@ def create_item_copies(num_copies=600):
     items = Item.objects.all()
     for _ in range(num_copies):
         item = random.choice(items)
-        status = random.choice(["Available", "Reserved", "Borrowed"])
+        status = random.choice(["Available", "Borrowed"])
         id_copy = fake.uuid4()
         ItemCopy.objects.create(item=item, status=status, id_copy=id_copy)
 
