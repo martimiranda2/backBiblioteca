@@ -25,6 +25,7 @@ api_settings.REFRESH_TOKEN_LIFETIME = timedelta(days=1)
 def get_token_by_email_and_password(email, password):
     try:
         user = authenticate(username=email, password=password)
+
         if user is None:
             raise AuthenticationFailed('Invalid email or password')
 
@@ -33,15 +34,16 @@ def get_token_by_email_and_password(email, password):
         token_data = {
             'id': user.id,
             'email': user.username,
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
         }
 
-        token_data['refresh'] = str(refresh)
-        token_data['access'] = str(refresh.access_token)
-        InfoLog(user, 'Token generated', 'Token generado exitosamente', '/get_token_by_email_and_password')
+        user_profile = UserProfile.objects.get(user=user)
+        InfoLog(user_profile, 'Token generated', 'Token generado exitosamente', '/get_token_by_email_and_password')
 
         return token_data
     except AuthenticationFailed as error:
-        WarningLog(None, 'Invalid credentials', 'No se ha podido crear un token porque las credenciales són inválidas: email={} / password={}'.format(email, password), '/get_token_by_email_and_password')
+        WarningLog(None, 'Invalid credentials', 'No se ha podido crear un token porque las credenciales són inválidas: email={} / password={}'.format(str(email), str(password)), '/get_token_by_email_and_password')
         raise error
     except TypeError as error:
         ErrorLog(None, 'TypeError', str(error), '/get_token_by_email_and_password')
@@ -60,22 +62,17 @@ def get_token_by_email_and_password(email, password):
 def new_login(request):
     if request.method == 'POST':
         try:
-            print('new_login -> request.body:', request.body)
             data = json.loads(request.body)
-            print('new_login -> data:', data)
             email = data.get('username')
             password = data.get('password')
 
             # Authenticate the user
             user = authenticate(request, username=email, password=password)
-            print('new_login -> user:', user)
             if user is not None and user.is_active:
-                print('new_login -> user type:', type(user))
-                # Assuming UserProfile is related to User via a OneToOneField
-                print('new_login -> user is not None and user.is_active')
                 user_profile = UserProfile.objects.get(user=user)
-                print('new_login -> user_profile:', user_profile)
+
                 token = get_token_by_email_and_password(email, password)
+
                 InfoLog(user_profile, 'Log In', 'Usuario autenticado exitosamente: {}'.format(email), '/new_login')
                 return JsonResponse({'message': 'User Authenticated successfully', 'token': token})
             else:
@@ -85,13 +82,13 @@ def new_login(request):
             ErrorLog(None, 'User not found', 'Perfil de usuario no encontrado para el usuario: {}'.format(user), '/new_login')
             return JsonResponse({'message': 'User profile not found'}, status=404)
         except TypeError as error:
-            ErrorLog(None, 'TypeError', str(error), '/get_token_by_email_and_password')
+            ErrorLog(None, 'TypeError', str(error), '/new_login')
             return JsonResponse({'message': 'Failed to authenticate user due to a TypeError'}, status=500)
         except AttributeError as error:
-            ErrorLog(None, 'AttributeError', str(error), '/get_token_by_email_and_password')
+            ErrorLog(None, 'AttributeError', str(error), '/new_login')
             return JsonResponse({'message': 'Failed to authenticate user due to an AttributeError'}, status=500)
         except KeyError as error:
-            ErrorLog(None, 'KeyError', str(error), '/get_token_by_email_and_password')
+            ErrorLog(None, 'KeyError', str(error), '/new_login')
             return JsonResponse({'message': 'Failed to authenticate user due to a KeyError'}, status=500)
         except json.JSONDecodeError as error:
             ErrorLog(None, 'JSONDecodeError', str(error), '/new_login')
@@ -140,7 +137,7 @@ def get_user_profile_by_email(email):
     try:
         user_profile = UserProfile.objects.get(email=email)
         return user_profile
-    except ObjectDoesNotExist:
+    except UserProfile.DoesNotExist:
         ErrorLog(None, 'User not found', 'Usuario no encontrado con el mail: {}'.format(email), '/get_user_by_id')
         return JsonResponse({'message': 'User profile not found'}, status=404)
 
@@ -148,7 +145,7 @@ def get_user_profile_by_email(email):
 def InfoLog(user, title, description, route):
     Log.objects.create(
         user=user,
-        log_level='INFO',
+        log_level='INFO'    ,
         title=title,
         description=description,
         route=route,
@@ -194,12 +191,17 @@ def save_logs(request):
     if request.method == 'POST':
         try:
             data = json.loads(request.body)
+
             for log_data in data:
-                user = log_data.get('user')
-                log_level = log_data.get('log_level')
+                email = log_data.get('user')
+                log_level = log_data.get('level')
                 title = log_data.get('title')
                 description = log_data.get('description')
                 route = log_data.get('route')
+
+                user = None;
+                if (email is not None):
+                    user = get_user_profile_by_email(email)
 
                 Log.objects.create(
                     user=user,
@@ -224,7 +226,7 @@ def save_logs(request):
             ErrorLog(None, 'JSONDecodeError', str(error), '/save_logs')
             return JsonResponse({'message': 'Failed to authenticate user due to a JSONDecodeError'}, status=500)
         except Exception as error:
-            ErrorLog(None, 'new_login', str(error), '/new_login')
+            ErrorLog(None, 'ERROR UNDEFINED', str(error), '/save_logs')
             return JsonResponse({'message': 'Failed to authenticate user'}, status=500)
     else:
         ErrorLog(None, 'Method not allowed', 'Se ha intentado acceder a save_logs mediante un method que no es POST', '/save_logs')
@@ -272,6 +274,7 @@ def user_details(request):
     if request.method == 'GET':
         try:
             authorization_header = request.headers.get('Authorization')
+
             if not authorization_header:
                 ErrorLog(None, 'Missing Auth Header', 'Falta la cabecera de autorización', '/user_details')
                 return JsonResponse({'error': 'Authorization header missing'}, status=400)
@@ -288,6 +291,7 @@ def user_details(request):
 
             try:
                 user_profile = UserProfile.objects.get(user_id=user_id)
+
             except UserProfile.DoesNotExist:
                 ErrorLog(None, 'User profile not found', 'Perfil de usuario no encontrado con id={}'.format(user_id), '/user_details')
                 return JsonResponse({'error': 'User profile not found'}, status=status.HTTP_404_NOT_FOUND)
@@ -307,7 +311,7 @@ def user_details(request):
                 'dni': user_profile.dni,
             }
 
-            InfoLog(user_profile.user, 'User Details Retrieved', 'Detalles de usuario obtenidos exitosamente', '/user_details')
+            InfoLog(user_profile, 'User Details Retrieved', 'Detalles de usuario obtenidos exitosamente', '/user_details')
             return JsonResponse(user_data, status=200)
 
         except UserProfile.DoesNotExist:
@@ -315,7 +319,7 @@ def user_details(request):
             return JsonResponse({'error': 'User profile not found'}, status=404)
 
         except Exception as error:
-            ErrorLog(None, 'User Details Retrieval Error', 'Error al obtener detalles de usuario', '/user_details')
+            ErrorLog(None, 'User Details Retrieval Error', 'Error al obtener detalles de usuario: {}'.format(error), '/user_details')
             return JsonResponse({'error': 'Failed to get user details'}, status=500)
 
     else:
@@ -444,7 +448,9 @@ def search_items(request):
                     for obj in model_results:
                         results.append({'id': obj.id, 'name': str(obj)})
                         if len(results) >= 5:
+                            InfoLog(None, 'Search Results', 'Resultados de búsqueda: {}'.format(results), '/search_items')
                             return JsonResponse(results, safe=False)
+            InfoLog(None, 'Search Results', 'Resultados de búsqueda: {}'.format(results), '/search_items')
             return JsonResponse(results, safe=False)
         except Exception as error:
             ErrorLog(None, 'Search Error', 'Error al realizar la búsqueda: {}'.format(str(error)), '/search_items')
