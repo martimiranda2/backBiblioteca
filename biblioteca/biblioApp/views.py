@@ -1,4 +1,5 @@
-import json
+import json,base64,os
+from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login
 from django.utils import timezone
@@ -11,6 +12,8 @@ from django.utils.encoding import force_bytes, force_str
 from django.core.mail import send_mail
 from django.template.loader import render_to_string
 from django.core.mail import BadHeaderError
+from django.core.files.base import ContentFile
+from django.conf import settings
 
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework.exceptions import AuthenticationFailed
@@ -19,7 +22,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.exceptions import TokenError
 
-from .models import Book, CD, Item, Dispositive, Log, User, Role, UserProfile
+from .models import Book, CD, Item, Dispositive, Log, User, Role, UserProfile, ItemCopy
 
 from datetime import timedelta
 from rest_framework_simplejwt.settings import api_settings
@@ -30,11 +33,138 @@ import environ
 env = environ.Env()
 environ.Env.read_env()
 
+
+
+
+def get_user_image(request, user_id):
+    if request.method == 'GET':
+        try:
+            user = User.objects.get(pk=user_id)
+            user_profile = UserProfile.objects.get(user=user)
+            if user_profile.image:
+                image_data = user_profile.image.read()
+                return HttpResponse(image_data, content_type='image/jpeg')
+            else:
+                image_path = os.path.join(settings.MEDIA_ROOT, 'user_images', 'no-photo-profile.png')
+                with open(image_path, 'rb') as f:
+                    return HttpResponse(f.read(), content_type='image/png')
+        except User.DoesNotExist:
+
+            return JsonResponse({'error': 'User profile not found'}, status=400)
+        except UserProfile.DoesNotExist:
+            
+            return JsonResponse({'error': 'User profile not found'}, status=400)
+    else:
+        
+        return JsonResponse({'error': 'Only GET requests are allowed'}, status=400)
+
+
+@api_view(['POST']) 
+def change_user_image(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        email = data.get('email')
+        image_data = data.get('image_data')  
+        userP = UserProfile.objects.filter(email=email).first()
+        if userP is not None:
+            user = userP.user
+            if image_data and user is not None:
+                format, imgstr = image_data.split(';base64,')
+                ext = format.split('/')[-1]
+                image = ContentFile(base64.b64decode(imgstr), name='temp.' + ext)
+
+                # Guardar la imagen en el objeto UserProfile
+                user_profile = UserProfile.objects.get(user=user)
+                user_profile.image = image
+                user_profile.save()
+
+                return JsonResponse({'message': 'Image uploaded successfully'})
+            else:
+                return JsonResponse({'error': 'Problem with the json data'}, status=400)
+        else:
+            return JsonResponse({'error': 'Problem with the json data'}, status=400)
+
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+
+@csrf_exempt
+def obtain_item_data(request,idItem):
+    try:
+        item = Item.objects.get(id=idItem)
+        
+        item_details = {
+            'title': item.title,
+            'material_type': item.material_type,
+            'signature': item.signature,
+            'loan_available': item.loan_available,
+        }
+
+        if hasattr(item, 'book'):
+            book_details = {
+                'type':'book',
+                'author': item.book.author,
+                'edition_date': item.book.edition_date,
+                'CDU': item.book.CDU,
+                'ISBN': item.book.ISBN,
+                'publisher': item.book.publisher,
+                'colection': item.book.colection,
+                'pages': item.book.pages,
+            }
+            item_details['more_details'] = book_details
+
+        elif hasattr(item, 'cd'):
+            cd_details = {
+                'type':'cd',
+                'author': item.cd.author,
+                'edition_date': item.cd.edition_date,
+                'discography': item.cd.discography,
+                'style': item.cd.style,
+                'duration': item.cd.duration,
+            }
+            item_details['more_details'] = cd_details
+
+        elif hasattr(item, 'dispositive'):
+            dispositive_details = {
+                'type':'dispositive',
+                'brand': item.dispositive.brand,
+                'dispo_type': item.dispositive.dispo_type,
+            }
+            item_details['more_details'] = dispositive_details
+
+        return JsonResponse(item_details)
+    
+    except Item.DoesNotExist:
+        return JsonResponse({'error': 'Item does not exist'}, status=404)
+@csrf_exempt
+def search_items_availables(request):
+    query = request.GET.get('item', '')
+    print('search_items -> query:', query)
+
+    results = []
+
+    models_to_search = [
+        (Item, ['title', 'material_type', 'signature'])
+    ]
+
+    for model, fields in models_to_search:
+        for field in fields:
+            filter_kwargs = {f"{field}__icontains": query}
+            model_results = model.objects.filter(**filter_kwargs)[:5]
+            for obj in model_results:
+                if obj.loan_available:
+                    if ItemCopy.objects.filter(item=obj, status='Available').exists():
+                        results.append({'id': obj.id, 'name': str(obj)})
+                        if len(results) >= 5:
+                            return JsonResponse(results, safe=False)
+
+    return JsonResponse(results, safe=False)
+
 @csrf_exempt
 def get_token_by_email_and_password(email, password):
     try:
-        user = authenticate(username=email, password=password)
-
+        userP = UserProfile.objects.filter(email=email).first()
+        user = authenticate(username=userP.user.username, password=password)
         if user is None:
             raise AuthenticationFailed('Invalid email or password')
 
@@ -74,19 +204,24 @@ def new_login(request):
             email = data.get('username')
             password = data.get('password')
 
-            # Authenticate the user
-            user = authenticate(request, username=email, password=password)
-            if user is not None and user.is_active:
+        # Authenticate the user
+            userP = UserProfile.objects.filter(email=email)
 
-                token = get_token_by_email_and_password(email, password)
-
-                InfoLog(email, 'Log In', 'Usuario autenticado exitosamente: {}'.format(email), '/new_login')
-                return JsonResponse({'message': 'User Authenticated successfully', 'token': token})
+            if userP.exists():
+                user_profile = userP.first()
+                if authenticate(username=user_profile.user.username, password=password):
+                    token = get_token_by_email_and_password(email, password)
+                    InfoLog(email, 'new_login', 'Usuario autenticado exitosamente', '/new_login')
+                    return JsonResponse({'message': 'User Authenticated successfully', 'token': token})
+                else:
+                    WarningLog('', 'new_login', 'Credenciales incorrectas', '/new_login')
+                    return JsonResponse({'message': 'Credenciales incorrectas'}, status=401)
             else:
-                WarningLog('', 'Incorrect credentials', 'Credenciales incorrectas: username={} / password={}'.format(email, password), '/new_login')
+                WarningLog('', 'new_login', 'Credenciales incorrectas', '/new_login')
                 return JsonResponse({'message': 'Incorrect credentials'}, status=401)
+
         except ObjectDoesNotExist:
-            ErrorLog('', 'User not found', 'Perfil de usuario no encontrado para el usuario: {}'.format(user), '/new_login')
+            ErrorLog('', 'User not found', 'Perfil de usuario no encontrado para el usuario: {}'.format(email), '/new_login')
             return JsonResponse({'message': 'User profile not found'}, status=404)
         except TypeError as error:
             ErrorLog('', 'TypeError', str(error), '/new_login')
@@ -445,12 +580,9 @@ def search_items(request):
 
         results = []
 
-        models_to_search = [
-            (Item, ['title', 'material_type', 'signature']),
-            (Book, ['title', 'author']),
-            (CD, ['title', 'author']),
-            (Dispositive, ['title', 'brand']),
-        ]
+    models_to_search = [
+        (Item, ['title', 'material_type', 'signature'])
+    ]
 
         try:
             for model, fields in models_to_search:
