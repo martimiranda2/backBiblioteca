@@ -567,17 +567,19 @@ def send_password_reset_email(request):
         return Response({'error': 'Ocurrió un error al enviar el correo electrónico'}, status=500)
     return Response({'success': 'Correo electrónico de restablecimiento de contraseña enviado exitosamente'}, status=200)
 
-def reset_password(request, uidb64, token):
+@api_view(['POST'])
+def reset_password(request):
     try:
-        uid = force_str(urlsafe_base64_decode(uidb64))
+        uid = force_str(urlsafe_base64_decode(request.data['uid']))
+        token = request.data['token']
         user = User.objects.get(pk=uid)
     except(TypeError, ValueError, OverflowError, User.DoesNotExist):
-        ErrorLog('', 'Invalid Token', 'El enlace de restablecimiento de la contraseña no es válido', '/reset_password')
-        return JsonResponse({'error': 'El enlace de restablecimiento de la contraseña no es válido'}, status=401)
+        ErrorLog('', 'Invalid Token', 'El enlace para restablecer la contraseña no es válido', '/reset_password')
+        return JsonResponse({'error': 'El enlace para restablecer la contraseña no es válido'}, status=401)
 
     if default_token_generator.check_token(user, token):
         try:
-            new_password = request.POST['new_password']
+            new_password = request.data['newPassword']
         except KeyError:
             ErrorLog('', 'Missing Password', 'No se proporcionó una nueva contraseña', '/reset_password')
             return JsonResponse({'error': 'No se proporcionó una nueva contraseña'}, status=402)
@@ -586,4 +588,4 @@ def reset_password(request, uidb64, token):
         InfoLog(user.email, 'Password Reset', 'Contraseña restablecida con éxito', '/reset_password')
         return JsonResponse({'message': 'Contraseña restablecida con éxito'}, status=200)
     else:
-        return JsonResponse({'error': 'El enlace de restablecimiento de la contraseña no es válido'}, status=403)
+        return JsonResponse({'error': 'El enlace para restablecer la contraseña no es válido'}, status=403)
