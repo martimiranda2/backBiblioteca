@@ -602,34 +602,6 @@ def search_items(request):
         ErrorLog('', 'Invalid Method', 'Método no permitido en /search_items', '/search_items')
         return JsonResponse({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
-# @api_view(['GET'])
-# def search_items(request):
-#     if request.method == 'GET':
-#         query = request.GET.get('item', '')
-
-#         models_to_search = [
-#             (Item, ['title', 'material_type', 'signature'])
-#         ]
-
-#         try:
-#             results = []
-#             for model, fields in models_to_search:
-#                 q_objects = Q()
-#                 for field in fields:
-#                     q_objects |= Q(**{f"{field}__icontains": query})
-#                 model_results = model.objects.filter(q_objects)[:5]
-#                 results += [{'id': obj.id, 'name': str(obj)} for obj in model_results]
-#                 if len(results) >= 5:
-#                     break
-#             InfoLog('', 'Search Results', 'Resultados de búsqueda: {}'.format(results), '/search_items')
-#             return JsonResponse(results, safe=False)
-        
-#         except Exception as error:
-#             ErrorLog('', 'Search Error', 'Error al realizar la búsqueda: {}'.format(str(error)), '/search_items')
-#             return JsonResponse({'error': 'Failed to perform search'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
-#     else:
-#         ErrorLog('', 'Invalid Method', 'Método no permitido en /search_items', '/search_items')
-#         return JsonResponse({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 @api_view(['POST'])
 def send_password_reset_email(request):
