@@ -12,6 +12,7 @@ https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 import environ,os
 from pathlib import Path
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -153,3 +154,15 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 AUTHENTICATION_BACKENDS = [
     'django.contrib.auth.backends.ModelBackend',
 ]
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = 'smtp.gmail.com'
+EMAIL_PORT = 587
+EMAIL_USE_TLS = True
+EMAIL_HOST_USER = env.str('EMAIL')
+EMAIL_HOST_PASSWORD = env.str('EMAIL_PASSWORD')
+
+if not EMAIL_HOST_PASSWORD:
+    raise ImproperlyConfigured('EMAIL_HOST_PASSWORD is not defined')
+if not EMAIL_HOST_USER:
+    raise ImproperlyConfigured('EMAIL_HOST_USER is not defined')
