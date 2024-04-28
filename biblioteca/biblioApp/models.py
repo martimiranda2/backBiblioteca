@@ -170,7 +170,7 @@ class Request(models.Model): #PETICIO
 
 
 class Log(models.Model):
-    user = models.ForeignKey(UserProfile, null=True, blank=True, on_delete=models.CASCADE)
+    user = models.CharField(max_length=100, blank=True, default='')
     log_level = models.CharField(max_length=1000)
     title = models.CharField(max_length=100)
     description = models.CharField(max_length=1000)
