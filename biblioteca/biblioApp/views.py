@@ -24,7 +24,7 @@ from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import Book, CD, Item, Dispositive, Log, User, Role, UserProfile, ItemCopy
 
-from datetime import timedelta
+from datetime import timedelta,datetime
 from rest_framework_simplejwt.settings import api_settings
 api_settings.ACCESS_TOKEN_LIFETIME = timedelta(minutes=15)
 api_settings.REFRESH_TOKEN_LIFETIME = timedelta(days=1)
@@ -58,6 +58,55 @@ def get_user_image(request, user_id):
         
         return JsonResponse({'error': 'Only GET requests are allowed'}, status=400)
 
+@api_view(['POST'])
+def show_users(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        email = data.get('email_admin')
+        userAdmin = UserProfile.objects.filter(email=email).first()
+        if userAdmin is not None:
+            rolAdmin = userAdmin.role.name
+            if rolAdmin == 'bibliotecari' or rolAdmin == 'admin' :
+                center = userAdmin.center
+                users_alumne = UserProfile.objects.filter(role__name='alumne', center=center)
+                user_profiles_json = list(users_alumne.values())
+                return JsonResponse({'user_profiles': user_profiles_json}, status=200)
+                
+            else:
+                return JsonResponse({'error': 'User is not an admin'}, status=400)
+        else:
+            return JsonResponse({'error': 'User not exist'}, status=400)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+@api_view(['POST'])
+def change_user_data_admin(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        email_admin = data.get('email_admin')
+        email_user = data.get('email_user')
+        user_admin = UserProfile.objects.filter(email=email_admin).first()
+        user_change = UserProfile.objects.filter(email=email_user).first()
+        
+        if user_admin is not None and user_change is not None:
+            role_admin = user_admin.role.name
+            if role_admin == 'bibliotecari':
+                user_change.name = data.get('name', user_change.name)
+                user_change.surname = data.get('surname', user_change.surname)
+                user_change.surname2 = data.get('surname2', user_change.surname2)
+                user_change.dni = data.get('dni', user_change.dni)
+                user_change.phone = data.get('phone', user_change.phone)
+                user_change.date_of_birth = datetime.strptime(data.get('birth', user_change.date_of_birth), "%d-%m-%Y")
+                user_change.cycle = data.get('cycle', user_change.cycle)
+                user_change.save()
+                
+                return JsonResponse({'message': 'User data updated successfully'}, status=200)
+            else:
+                return JsonResponse({'error': 'User is not an admin'}, status=400)
+        else:
+            return JsonResponse({'error': 'User not found'}, status=400)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @api_view(['POST']) 
 def change_user_image(request):
@@ -243,6 +292,58 @@ def new_login(request):
         ErrorLog('', 'Method not allowed', 'Se ha intentado acceder a new_login mediante un method que no es POST', '/new_login')
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
+
+@api_view(['POST'])
+def create_user(request):
+    if request.method == 'POST':
+        try:
+            data = json.loads(request.body)
+            
+            user_data = {
+                'email': data.pop('email', None),
+                'name': data.pop('name', None),
+                'surname': data.pop('surname', None),
+                'surname2': data.pop('surname2', None),
+                'dni': data.pop('dni', None),
+                'phone': data.pop('phone', None),
+                'date_of_birth':datetime.strptime(data.pop('birth', None), "%d-%m-%Y"),
+                'cycle': data.pop('cycle', None),
+            }
+            userD ={
+                'username': data.pop('username', None),
+                'password': data.pop('password', None)
+
+            }
+            role = Role.objects.get(name='alumne')
+            
+            email_admin = data.get('email_admin')
+            user_admin = UserProfile.objects.filter(email=email_admin).first()
+            if user_admin is None:
+                return JsonResponse({'error': 'El usuario administrador no existe'}, status=404)
+            
+            rol_admin = user_admin.role.name
+            if rol_admin not in ['bibliotecari', 'admin']:
+                return JsonResponse({'error': 'El usuario administrador no tiene permisos para crear usuarios'}, status=403)
+            
+            center = user_admin.center
+            
+            user = User.objects.create_user(**userD)
+            
+            UserProfile.objects.create(
+                user=user,
+                role=role,
+                center=center,
+                **user_data  
+            )
+            
+            return JsonResponse({'message': 'Usuario creado correctamente'}, status=201)
+        
+        except Exception as e:
+            print("Tipo de excepción:", type(e).__name__)
+            print("Mensaje de excepción:", str(e))
+            return JsonResponse({'error': str(e)}, status=400)
+    else:
+        return JsonResponse({'error': 'Método no permitido'}, status=405)
 
 def register(password, name, surname, surname2, role_id, date_of_birth, center, cycle, dni, email, image=None):
     try:

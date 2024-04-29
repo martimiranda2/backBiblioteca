@@ -15,7 +15,17 @@ class Role(models.Model):
     def __str__(self):
         return self.name
 
+class Center(models.Model):
+    name = models.CharField(max_length=100 , verbose_name="Nom del centre")
 
+    class Meta:
+        verbose_name = "Centre"
+        verbose_name_plural = "Centres"
+
+
+    def __str__(self):
+        return self.name
+    
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE , verbose_name="Usuari")
     email = models.EmailField(unique=True, verbose_name="Correu electrònic")
@@ -26,7 +36,7 @@ class UserProfile(models.Model):
     dni =  models.CharField(max_length=9, unique=True,blank=True, null=True, verbose_name='DNI')
     role = models.ForeignKey(Role, on_delete=models.CASCADE, verbose_name="Rol d'usuari")
     date_of_birth = models.DateField(verbose_name="Data de naixement")
-    center = models.CharField(max_length=100 , verbose_name="Centre al que pertany")
+    center = models.ForeignKey(Center, on_delete=models.CASCADE, verbose_name="Centre", null=True)
     cycle = models.CharField(max_length=100 , verbose_name="Curs al que pertany")
     image = models.ImageField(upload_to='user_images/', blank=True, null=True , verbose_name="Imatge de perfil")
     password_changed = models.BooleanField(default=False)

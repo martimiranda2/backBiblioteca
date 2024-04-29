@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from faker import Faker
 from django.contrib.auth.models import User
 from django.core.management.base import BaseCommand
-from biblioApp.models import Role,UserProfile, Item, Book, CD, Dispositive, ItemCopy, Reservation, Loan, Request, Log
+from biblioApp.models import Role,UserProfile,Center, Item, Book, CD, Dispositive, ItemCopy, Reservation, Loan, Request, Log
 
 
 fake = Faker('es_ES')
@@ -31,22 +31,13 @@ def create_rols():
         Role.objects.create(**role_data)
 
 def create_users(num_users=100):
-    centers = [
-    "Institut Escola del Treball de Barcelona",
-    "Institut Jaume Balmes de Barcelona",
-    "Institut Lluís Vives de Barcelona",
-    "Institut Ramon Berenguer IV de Lleida",
-    "Institut Jaume Callís i Franqueta de Granollers",
-    "Institut Lauro de Sant Boi de Llobregat",
-    "Institut Salvador Espriu de Cornellà de Llobregat",
-    "Institut Pau Claris de Barcelona",
-    "Institut Sant Josep de Calassanç de Barcelona",
-    "Institut de Badalona"
-    ]  
 
 
     cycles = ["1ESO","2ESO","3ESO","4ESO","1Bachillerat","2Bachillerat","Cicle Grau Mitjà Gestió administrativa", "Cicle Grau Mitjà Electromecànica de vehicles automòbils", "Cicle Grau Mitjà Mecanització","Cicle Grau Mitjà Manteniment electromecànic", "Cicle Grau Mitjà Sistemes microinformàtics i xarxes","Cicle Grau Superior Assistència a la direcció", "Cicle Grau Superior Administració i finances", "Cicle Grau Superior Automoció","Cicle Grau Superior Programació de la producció en fabricació mecànica","Cicle Grau Superior Mecatrònica industrial","Cicle Grau Superior Gestió de l'aigua","Cicle Grau Superior Desenvolupament d'aplicacions multiplataforma", "Cicle Grau Superior Desenvolupament d'aplicacions web"]
     role = Role.objects.get(name="alumne")
+
+    center_name = "IES Esteve Terradas I Illa"
+    center, created = Center.objects.get_or_create(name=center_name)
    
     for _ in range(num_users):
         surname = fake.last_name()
@@ -62,7 +53,7 @@ def create_users(num_users=100):
         email = fake.unique.email()
         phone = fake.phone_number()
         password = fake.password()
-        center = random.choice(centers)
+        center = center
         cycle = random.choice(cycles)
         user = User.objects.create_user(username=username, email=email, password=password)
        
