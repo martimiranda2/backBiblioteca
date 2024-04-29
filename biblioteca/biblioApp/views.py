@@ -46,6 +46,25 @@ def get_user_image(request, user_id):
         
         return JsonResponse({'error': 'Only GET requests are allowed'}, status=400)
 
+@api_view(['POST'])
+def change_user_data(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        email = data.get('email_admin')
+        emailUser = data.get('email_user')
+        userAdmin = UserProfile.objects.filter(email=emailUser).first()
+        userChange = UserProfile.objects.filter(email=email).first()
+        if userAdmin is not None and userChange is not None :
+            rolAdmin = userAdmin.role.name
+            if rolAdmin == 'bibliotecari':
+                print("ok")
+                return JsonResponse({'message': 'Data uploaded successfully'})
+            else:
+                 return JsonResponse({'error': 'User is not an admin'}, status=400)
+        else:
+            return JsonResponse({'error': 'User not exist'}, status=400)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @api_view(['POST']) 
 def change_user_image(request):

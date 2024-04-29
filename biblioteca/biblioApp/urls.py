@@ -10,6 +10,7 @@ urlpatterns = [
     path('auth/save-password/', views.save_password, name='save_password'),
     path('user/userDetails/', views.user_details, name='user_details'),
     path('user/change-photo/', views.change_user_image, name='change_user_image'),
+    path('user/change-data/', views.change_user_data, name='change_user_data'),
     path('user/get_image/<int:user_id>/', views.get_user_image, name='get_user_image'),
     path('user/update/', views.update_data_user, name='update_data_user'),
     path('items/search/', views.search_items, name='search_items'),
