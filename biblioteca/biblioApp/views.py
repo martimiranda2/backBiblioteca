@@ -39,7 +39,7 @@ environ.Env.read_env()
 def get_user_image(request, user_id):
     if request.method == 'GET':
         try:
-            user = User.objects.get(pk=user_id)
+            user = User.objects.get(id=user_id)
             user_profile = UserProfile.objects.get(user=user)
             if user_profile.image:
                 image_data = user_profile.image.read()
