@@ -33,13 +33,13 @@ class UserProfile(models.Model):
     name = models.CharField(max_length=100 , verbose_name="Nom")
     surname = models.CharField(max_length=100 , verbose_name="Cognom")
     surname2 = models.CharField(max_length=100 , verbose_name="Segon cognom (opcional)", blank=True, null=True)
-    dni =  models.CharField(max_length=9, unique=True,blank=True, null=True, verbose_name='DNI')
+    dni =  models.CharField(max_length=9, blank=True, null=True, verbose_name='DNI')
     role = models.ForeignKey(Role, on_delete=models.CASCADE, verbose_name="Rol d'usuari")
     date_of_birth = models.DateField(verbose_name="Data de naixement")
     center = models.ForeignKey(Center, on_delete=models.CASCADE, verbose_name="Centre", null=True)
     cycle = models.CharField(max_length=100 , verbose_name="Curs al que pertany")
     image = models.ImageField(upload_to='user_images/', blank=True, null=True , verbose_name="Imatge de perfil")
-
+    password_changed = models.BooleanField(default=False)
 
     class Meta:
         verbose_name = "Perfil d'usuari"
@@ -147,8 +147,7 @@ class Reservation(models.Model): #RESERVA
 
 
     def __str__(self):
-        return self.user+" "+self.reservation_date
-
+        return self.user + " " + str(self.reservation_date)
 
 class Loan(models.Model): #PRESTEC
     user = models.ForeignKey(UserProfile, on_delete=models.CASCADE, verbose_name="Usuari")
@@ -182,7 +181,7 @@ class Request(models.Model): #PETICIO
 
 
 class Log(models.Model):
-    user = models.ForeignKey(UserProfile, null=True, blank=True, on_delete=models.CASCADE)
+    user = models.CharField(max_length=100, blank=True, default='')
     log_level = models.CharField(max_length=1000)
     title = models.CharField(max_length=100)
     description = models.CharField(max_length=1000)
