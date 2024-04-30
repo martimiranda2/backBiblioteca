@@ -35,7 +35,7 @@ class UserProfile(models.Model):
     surname2 = models.CharField(max_length=100 , verbose_name="Segon cognom (opcional)", blank=True, null=True)
     dni =  models.CharField(max_length=9, unique=True,blank=True, null=True, verbose_name='DNI')
     role = models.ForeignKey(Role, on_delete=models.CASCADE, verbose_name="Rol d'usuari")
-    date_of_birth = models.DateField(verbose_name="Data de naixement")
+    date_of_birth = models.DateField(verbose_name="Data de naixement",null=True)
     center = models.ForeignKey(Center, on_delete=models.CASCADE, verbose_name="Centre", null=True)
     cycle = models.CharField(max_length=100 , verbose_name="Curs al que pertany")
     image = models.ImageField(upload_to='user_images/', blank=True, null=True , verbose_name="Imatge de perfil")

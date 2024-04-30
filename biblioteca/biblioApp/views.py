@@ -1,4 +1,4 @@
-import json,base64,os
+import json,base64,os,re
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login
@@ -7,6 +7,8 @@ from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
 from django.core.files.base import ContentFile
 from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import validate_email
 
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework.exceptions import AuthenticationFailed
@@ -477,25 +479,19 @@ def user_details(request):
 @api_view(['POST']) 
 def update_data_user(request):
     if request.method == 'POST':
-        user_data = json.loads(request.body).get('data')
-        print('update_data_user -> user_data', user_data)
-
+        user_data = json.loads(request.body)
         try:
-            user = User.objects.get(username=user_data.get('username'))
-            print('update_data_user -> user encontrado')
-            user_profile = UserProfile.objects.get(user=user)
-            print('update_data_user -> user profile encontrado')
-
-            if 'email' in user_data:
-                user.username = user_data.get('email')
+            user_profile = get_object_or_404(UserProfile, email=user_data.get('email_user'))
+            
+            if 'email_change' in user_data:
+                user_profile.email = user_data.get('email_change')
             if 'first_name' in user_data:
                 user_profile.name = user_data.get('first_name')
-            if 'last_name' in user_data:
-                user_profile.surname = user_data.get('last_name')
-            if 'second_last_name' in user_data:
-                user_profile.surname2 = user_data.get('second_last_name')
+            if 'surname' in user_data:
+                user_profile.surname = user_data.get('surname')
+            if 'surname2' in user_data:
+                user_profile.surname2 = user_data.get('surname2')
 
-            user.save()
             user_profile.save()
             return JsonResponse({'message': 'User data updated successfully'}, status=200)
         except User.DoesNotExist:
@@ -530,7 +526,6 @@ def save_password(request):
         try:
             user = User.objects.get(username=email)
             user.set_password(new_password)
-            user.save()
             return JsonResponse({'message': 'Password updated successfully'}, status=200)
         except User.DoesNotExist:
             return JsonResponse({'message': 'User does not exist'}, status=404)
@@ -559,5 +554,74 @@ def search_items(request):
 
     return JsonResponse(results, safe=False)
 
+@api_view(['POST'])
+def save_csv(request):
+    saves = 0
+    json_data = json.loads(request.body)
+    userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
+    center = userAdmin.center
+    if userAdmin.role.name != 'bibliotecari' and userAdmin.role.name != 'admin':
+        return JsonResponse({'error': 'email_admin no coincideix amb un usuari admin'}, status=400)
+    user_profiles_data = json_data.get('user_profiles_csv', [])
+    errors = []
+    if request.method == 'POST':
+        for profile_data in user_profiles_data:
+            error = False
+            name = profile_data.get('nom', '')
+            surname = profile_data.get('cognom1', '')
+            surname2 = profile_data.get('cognom2', '')
+            email = profile_data.get('email', '')
+            phone = profile_data.get('telefon', '')
+            cycle = profile_data.get('curs', '')
+            
+            if not name or not surname or any(char.isdigit() for char in name) or any(char.isdigit() for char in surname):
+                error = True
+                errors.append({'error':'El nom i el cognom del registre '+ id_register+' no poden estar buits ni contindre numeros'})
+
+        
+            if surname2 and any(char.isdigit() for char in surname2):
+                error = True
+                errors.append({'error':'El segon cognom del registre '+ id_register+' no pot  contindre cap número'})
+
+        
+            try:
+                validate_email(email)
+            except ValidationError:
+                error = True
+                errors.append({'error':'El email del registre '+ id_register+' no es valid'})
 
 
+            if UserProfile.objects.filter(email=email).exists():
+                if UserProfile.objects.filter(email=email,name=name,surname=surname,surname2=surname2,phone=phone,cycle=cycle).exists():
+                    error = True
+                else:
+                    error = True
+                    errors.append({'error':'El email del registre '+ id_register+' ja existeix com a usuari'})
+
+
+            if phone:
+                if not re.match(r'^\d{9}$', phone):
+                    error = True
+                    errors.append({'error':'El telefon del registre '+ id_register+' ha de contindre 9 numeros'})
+
+
+            if not cycle:
+                error = True
+                errors.append({'error':'El curs del registre '+ id_register+' no pot estar buit'})
+
+            if not error:
+                saves += 1
+                user_profile = UserProfile.objects.create(
+                name=name,
+                surname=surname,
+                surname2=surname2,
+                email=email,
+                phone=phone,
+                cycle=cycle
+                )
+                user_profile.save()
+            
+        
+        return JsonResponse({'message': r's\'han creat'+str(saves)+'usuaris nous','errors':errors}, status=201)
+    else:
+        return JsonResponse({'error': 'Only POST requests are allowed'}, status=400)
