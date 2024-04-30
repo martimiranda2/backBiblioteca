@@ -547,7 +547,7 @@ def user_details(request):
                 'surname2': user_profile.surname2,
                 'role': user_profile.role.id,
                 'date_of_birth': user_profile.date_of_birth,
-                'center': user_profile.center,
+                'center': user_profile.center.name,
                 'cycle': user_profile.cycle,
                 'image': str(user_profile.image) if user_profile.image else None,
                 'dni': user_profile.dni,
