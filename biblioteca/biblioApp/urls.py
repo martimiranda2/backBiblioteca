@@ -11,6 +11,7 @@ urlpatterns = [
     path('auth/send-mail/', views.send_password_reset_email, name='send_password_reset_email'),
     path('auth/reset-password/', views.reset_password, name='reset_password'),
     path('auth/create-user/', views.create_user, name='create_user'),
+    path('auth/check-user-exists/', views.check_user_exists, name='check_user_exists'),
 
     path('user/userDetails/', views.user_details, name='user_details'),
     path('user/change-photo/', views.change_user_image, name='change_user_image'),

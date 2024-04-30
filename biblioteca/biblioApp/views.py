@@ -375,14 +375,42 @@ def get_user_by_id(user_id):
     except ObjectDoesNotExist:
         ErrorLog('', 'User not found', 'Usuario no encontrado con el id: {}'.format(user_id), '/get_user_by_id')
         return JsonResponse({'message': 'User profile not found'}, status=404)
+    
+def get_user_by_username(username):
+    try:
+        user = User.objects.get(username=username)
+        return user
+    except ObjectDoesNotExist:
+        Warning('', 'User not found', 'Usuario no encontrado con el username: {}'.format(username), '/get_user_by_username')
+        raise ObjectDoesNotExist
 
 def get_user_profile_by_email(email):
     try:
         user_profile = UserProfile.objects.get(email=email)
         return user_profile
     except UserProfile.DoesNotExist:
-        ErrorLog('', 'User not found', 'Usuario no encontrado con el mail: {}'.format(email), '/get_user_by_id')
-        return JsonResponse({'message': 'User profile not found'}, status=404)
+        Warning('', 'User not found', 'Usuario no encontrado con el mail: {}'.format(email), '/get_user_by_id')
+        raise UserProfile.DoesNotExist
+
+@api_view(['GET'])
+def check_user_exists(request):
+    username = request.GET.get('username')
+    email = request.GET.get('email')
+    username_exists = email_exists = False
+    try:
+        get_user_by_username(username)
+        username_exists = True
+        WarningLog('', 'User exists', f'Existe un usuario con username = "{username}"', '/check_user_exists')
+    except ObjectDoesNotExist:
+        InfoLog('', 'User not found', f'No existe ningún usuario con username = "{username}"', '/check_user_exists')
+    try:
+        get_user_profile_by_email(email)
+        email_exists = True
+        WarningLog('', 'User exists', f'Existe un usuario con email = "{email}"', '/check_user_exists')
+    except UserProfile.DoesNotExist:
+        InfoLog('', 'User not found', f'No existe ningún usuario con email = "{email}"', '/check_user_exists')
+    InfoLog('', 'User check', f'Comprobación de usuario realizada exitosamente (username_exists: {username_exists}, email_exists: {email_exists})', '/check_user_exists')
+    return Response({'username_exists': username_exists, 'email_exists': email_exists})
 
 # Funcion logs
 def InfoLog(user, title, description, route):
