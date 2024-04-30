@@ -33,7 +33,7 @@ class UserProfile(models.Model):
     name = models.CharField(max_length=100 , verbose_name="Nom")
     surname = models.CharField(max_length=100 , verbose_name="Cognom")
     surname2 = models.CharField(max_length=100 , verbose_name="Segon cognom (opcional)", blank=True, null=True)
-    dni =  models.CharField(max_length=9, unique=True,blank=True, null=True, verbose_name='DNI')
+    dni =  models.CharField(max_length=9, blank=True, null=True, verbose_name='DNI')
     role = models.ForeignKey(Role, on_delete=models.CASCADE, verbose_name="Rol d'usuari")
     date_of_birth = models.DateField(verbose_name="Data de naixement")
     center = models.ForeignKey(Center, on_delete=models.CASCADE, verbose_name="Centre", null=True)
