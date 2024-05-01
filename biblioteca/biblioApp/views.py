@@ -16,7 +16,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Book, CD, Item, Dispositive, Log, User, Role, UserProfile, ItemCopy
+from .models import Book, CD, Loan, Item, Dispositive, Log, User, Role, UserProfile, ItemCopy
 
 from datetime import timedelta,datetime
 from rest_framework_simplejwt.settings import api_settings
@@ -635,7 +635,28 @@ def save_csv(request):
 
 @api_view(['POST'])
 def make_loan(request):
-    saves = 0
     json_data = json.loads(request.body)
-    userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
-    return
+    user_profile = get_object_or_404(UserProfile, email=json_data.get('email'))
+    item_copy_id = json_data.get('item_copy_id')
+    return_date = json_data.get('return_date')  
+
+    item_copy = get_object_or_404(ItemCopy, pk=item_copy_id, status="Available")
+    item_copy.status = 'Loaned'
+    item_copy.save()
+    
+    loan_date = timezone.now().date()  
+
+    loan = Loan.objects.create(
+        user=user_profile,
+        copy=item_copy,
+        loan_date=loan_date,
+        return_date=return_date
+    )
+
+    return JsonResponse({'message': 'Préstamo creado exitosamente'}, status=200)
+
+@csrf_exempt
+def obtain_item_copies(request,idItem):
+    item_copies = ItemCopy.objects.filter(item_id=idItem, status='Available')
+    copies_data = list(item_copies.values())  
+    return JsonResponse({'copies': copies_data})

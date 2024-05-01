@@ -19,7 +19,9 @@ urlpatterns = [
     path('user/update/', views.update_data_user, name='update_data_user'),
     path('items/search/', views.search_items, name='search_items'),
     path('items/search/<idItem>/', views.obtain_item_data, name='obtain_item_data'),
+    path('items/search-item-copies/<idItem>/', views.obtain_item_copies, name='obtain_item_copies'),
     path('items/search-availables/', views.search_items_availables, name='search_items_availables'),
+    path('items/make-loan/', views.make_loan, name='make_loan'),
     path('logs/save/', views.save_logs, name='save_log'),
     
 ]
