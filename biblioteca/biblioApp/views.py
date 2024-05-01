@@ -560,6 +560,7 @@ def save_csv(request):
     json_data = json.loads(request.body)
     userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
     center = userAdmin.center
+    role = get_object_or_404(Role, name='alumne')
     if userAdmin.role.name != 'bibliotecari' and userAdmin.role.name != 'admin':
         return JsonResponse({'error': 'email_admin no coincideix amb un usuari admin'}, status=400)
     user_profiles_data = json_data.get('user_profiles_csv', [])
@@ -573,6 +574,7 @@ def save_csv(request):
             email = profile_data.get('email', '')
             phone = profile_data.get('telefon', '')
             cycle = profile_data.get('curs', '')
+            id_register = str(profile_data.get('id_register', ''))
             
             if not name or not surname or any(char.isdigit() for char in name) or any(char.isdigit() for char in surname):
                 error = True
@@ -600,9 +602,10 @@ def save_csv(request):
 
 
             if phone:
-                if not re.match(r'^\d{9}$', phone):
+                if not any(char.isdigit() for char in phone):
                     error = True
-                    errors.append({'error':'El telefon del registre '+ id_register+' ha de contindre 9 numeros'})
+                    errors.append({'error': 'El telefon del registre ' + id_register + ' ha de contidre només números'})
+
 
 
             if not cycle:
@@ -611,17 +614,28 @@ def save_csv(request):
 
             if not error:
                 saves += 1
+                user = User.objects.create_user(username=name+surname, email=email, password="biblioteca")
                 user_profile = UserProfile.objects.create(
-                name=name,
-                surname=surname,
-                surname2=surname2,
-                email=email,
-                phone=phone,
-                cycle=cycle
+                    user=user,
+                    name=name,
+                    surname=surname,
+                    surname2=surname2,
+                    email=email,
+                    phone=phone,
+                    cycle=cycle,
+                    center=center,
+                    role=role
                 )
                 user_profile.save()
             
         
-        return JsonResponse({'message': r's\'han creat'+str(saves)+'usuaris nous','errors':errors}, status=201)
+        return JsonResponse({'message':str(saves)+' usuaris afegits correctament','errors':errors}, status=201)
     else:
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=400)
+
+@api_view(['POST'])
+def make_loan(request):
+    saves = 0
+    json_data = json.loads(request.body)
+    userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
+    return
