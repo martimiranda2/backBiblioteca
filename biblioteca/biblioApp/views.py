@@ -5,6 +5,13 @@ from django.contrib.auth import authenticate, login
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from django.db.models import Q
+from django.core.exceptions import ObjectDoesNotExist
+from django.contrib.auth.tokens import default_token_generator
+from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
+from django.utils.encoding import force_bytes, force_str
+from django.core.mail import send_mail
+from django.template.loader import render_to_string
+from django.core.mail import BadHeaderError
 from django.core.files.base import ContentFile
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -15,6 +22,7 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
+from rest_framework_simplejwt.exceptions import TokenError
 
 from .models import Book, CD, Loan, Item, Dispositive, Log, User, Role, UserProfile, ItemCopy
 
@@ -23,13 +31,17 @@ from rest_framework_simplejwt.settings import api_settings
 api_settings.ACCESS_TOKEN_LIFETIME = timedelta(minutes=15)
 api_settings.REFRESH_TOKEN_LIFETIME = timedelta(days=1)
 
+import environ
+env = environ.Env()
+environ.Env.read_env()
+
 
 
 
 def get_user_image(request, user_id):
     if request.method == 'GET':
         try:
-            user = User.objects.get(pk=user_id)
+            user = User.objects.get(id=user_id)
             user_profile = UserProfile.objects.get(user=user)
             if user_profile.image:
                 image_data = user_profile.image.read()
@@ -212,40 +224,74 @@ def get_token_by_email_and_password(email, password):
         token_data = {
             'id': user.id,
             'email': user.username,
+            'refresh': str(refresh),
+            'access': str(refresh.access_token),
         }
 
-        token_data['refresh'] = str(refresh)
-        token_data['access'] = str(refresh.access_token)
-        InfoLog(user, 'get_token_by_email_and_password', 'Token generado exitosamente', '/get_token_by_email_and_password')
+        InfoLog(email, 'Token generated', 'Token generado exitosamente', '/get_token_by_email_and_password')
 
         return token_data
+    except AuthenticationFailed as error:
+        WarningLog('', 'Invalid credentials', 'No se ha podido crear un token porque las credenciales són inválidas: email={} / password={}'.format(str(email), str(password)), '/get_token_by_email_and_password')
+        raise error
+    except TypeError as error:
+        ErrorLog('', 'TypeError', str(error), '/get_token_by_email_and_password')
+        raise error
+    except AttributeError as error:
+        ErrorLog('', 'AttributeError', str(error), '/get_token_by_email_and_password')
+        raise error
+    except KeyError as error:
+        ErrorLog('', 'KeyError', str(error), '/get_token_by_email_and_password')
+        raise error
     except Exception as error:
-        ErrorLog(None, 'get_token_by_email_and_password', str(error), '/get_token_by_email_and_password')
+        ErrorLog('', 'ERROR UNDEFINED', str(error), '/get_token_by_email_and_password')
+
 
 @csrf_exempt
 def new_login(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
-        email = data.get('username')
-        password = data.get('password')
+        try:
+            data = json.loads(request.body)
+            email = data.get('username')
+            password = data.get('password')
 
         # Authenticate the user
-        userP = UserProfile.objects.filter(email=email)
+            userP = UserProfile.objects.filter(email=email)
 
-        if userP.exists():
-            user_profile = userP.first()
-            if authenticate(username=user_profile.user.username, password=password):
-                token = get_token_by_email_and_password(email, password)
-                InfoLog(user_profile, 'new_login', 'Usuario autenticado exitosamente', '/new_login')
-                return JsonResponse({'message': 'User Authenticated successfully', 'token': token})
+            if userP.exists():
+                user_profile = userP.first()
+                if authenticate(username=user_profile.user.username, password=password):
+                    token = get_token_by_email_and_password(email, password)
+                    InfoLog(email, 'new_login', 'Usuario autenticado exitosamente', '/new_login')
+                    return JsonResponse({'message': 'User Authenticated successfully', 'token': token})
+                else:
+                    WarningLog('', 'new_login', 'Credenciales incorrectas', '/new_login')
+                    return JsonResponse({'message': 'Credenciales incorrectas'}, status=401)
             else:
-                WarningLog(None, 'new_login', 'Credenciales incorrectas', '/new_login')
-                return JsonResponse({'message': 'Credenciales incorrectas'}, status=401)
-        else:
-            WarningLog(None, 'new_login', 'Credenciales incorrectas', '/new_login')
-            return JsonResponse({'message': 'Incorrect credentials'}, status=401)
+                WarningLog('', 'new_login', 'Credenciales incorrectas', '/new_login')
+                return JsonResponse({'message': 'Incorrect credentials'}, status=401)
 
+        except ObjectDoesNotExist:
+            ErrorLog('', 'User not found', 'Perfil de usuario no encontrado para el usuario: {}'.format(email), '/new_login')
+            return JsonResponse({'message': 'User profile not found'}, status=404)
+        except TypeError as error:
+            ErrorLog('', 'TypeError', str(error), '/new_login')
+            return JsonResponse({'message': 'Failed to authenticate user due to a TypeError'}, status=500)
+        except AttributeError as error:
+            ErrorLog('', 'AttributeError', str(error), '/new_login')
+            return JsonResponse({'message': 'Failed to authenticate user due to an AttributeError'}, status=500)
+        except KeyError as error:
+            ErrorLog('', 'KeyError', str(error), '/new_login')
+            return JsonResponse({'message': 'Failed to authenticate user due to a KeyError'}, status=500)
+        except json.JSONDecodeError as error:
+            ErrorLog('', 'JSONDecodeError', str(error), '/new_login')
+            return JsonResponse({'message': 'Failed to authenticate user due to a JSONDecodeError'}, status=500)
+        except Exception as error:
+            ErrorLog('', 'new_login', str(error), '/new_login')
+            return JsonResponse({'message': 'Failed to authenticate user'}, status=500)
+        
     else:
+        ErrorLog('', 'Method not allowed', 'Se ha intentado acceder a new_login mediante un method que no es POST', '/new_login')
         return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 
@@ -325,19 +371,54 @@ def register(password, name, surname, surname2, role_id, date_of_birth, center, 
 
 
 def get_user_by_id(user_id):
-    user = get_object_or_404(User, id=user_id)
-    return user
+    try:
+        user = User.objects.get(id=user_id)
+        return user
+    except ObjectDoesNotExist:
+        ErrorLog('', 'User not found', 'Usuario no encontrado con el id: {}'.format(user_id), '/get_user_by_id')
+        return JsonResponse({'message': 'User profile not found'}, status=404)
+    
+def get_user_by_username(username):
+    try:
+        user = User.objects.get(username=username)
+        return user
+    except ObjectDoesNotExist:
+        Warning('', 'User not found', 'Usuario no encontrado con el username: {}'.format(username), '/get_user_by_username')
+        raise ObjectDoesNotExist
 
 def get_user_profile_by_email(email):
-    user_profile = get_object_or_404(UserProfile, email=email)
-    return user_profile
+    try:
+        user_profile = UserProfile.objects.get(email=email)
+        return user_profile
+    except UserProfile.DoesNotExist:
+        Warning('', 'User not found', 'Usuario no encontrado con el mail: {}'.format(email), '/get_user_by_id')
+        raise UserProfile.DoesNotExist
 
+@api_view(['GET'])
+def check_user_exists(request):
+    username = request.GET.get('username')
+    email = request.GET.get('email')
+    username_exists = email_exists = False
+    try:
+        get_user_by_username(username)
+        username_exists = True
+        WarningLog('', 'User exists', f'Existe un usuario con username = "{username}"', '/check_user_exists')
+    except ObjectDoesNotExist:
+        InfoLog('', 'User not found', f'No existe ningún usuario con username = "{username}"', '/check_user_exists')
+    try:
+        get_user_profile_by_email(email)
+        email_exists = True
+        WarningLog('', 'User exists', f'Existe un usuario con email = "{email}"', '/check_user_exists')
+    except UserProfile.DoesNotExist:
+        InfoLog('', 'User not found', f'No existe ningún usuario con email = "{email}"', '/check_user_exists')
+    InfoLog('', 'User check', f'Comprobación de usuario realizada exitosamente (username_exists: {username_exists}, email_exists: {email_exists})', '/check_user_exists')
+    return Response({'username_exists': username_exists, 'email_exists': email_exists})
 
 # Funcion logs
 def InfoLog(user, title, description, route):
     Log.objects.create(
         user=user,
-        log_level='INFO',
+        log_level='INFO'    ,
         title=title,
         description=description,
         route=route,
@@ -381,71 +462,111 @@ def ErrorLog(user, title, description, route):
 @api_view(['POST'])
 def save_logs(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
-        for log_data in data:
-            user = log_data.get('user')
-            log_level = log_data.get('log_level')
-            title = log_data.get('title')
-            description = log_data.get('description')
-            route = log_data.get('route')
+        try:
+            data = json.loads(request.body)
+            for log_data in data:
+                if isinstance(log_data, dict):
+                    email = log_data.get('user')
+                    log_level = log_data.get('level')
+                    title = log_data.get('title')
+                    description = log_data.get('description')
+                    route = log_data.get('route')
 
-            Log.objects.create(
-                user=user,
-                log_level=log_level,
-                title=title,
-                description=description,
-                route=route,
-                date=timezone.now()
-            )
+                    Log.objects.create(
+                        user=email,
+                        log_level=log_level,
+                        title=title,
+                        description=description,
+                        route=route,
+                        date=timezone.now()
+                    )
+                else:
+                    WarningLog('', 'Invalid log data', f'Datos de log inválidos: {log_data}', '/save_logs')
+                    pass
+            return JsonResponse({'message': 'Logs saved successfully'}, status=201)
 
-        return JsonResponse({'message': 'Logs saved successfully'}, status=201)
-
-    return JsonResponse({'error': 'Invalid request'}, status=400)
+        except TypeError as error:
+            ErrorLog('', 'TypeError', str(error), '/save_logs')
+            return JsonResponse({'message': 'Failed to authenticate user due to a TypeError'}, status=500)
+        except AttributeError as error:
+            ErrorLog('', 'AttributeError', str(error), '/save_logs')
+            return JsonResponse({'message': 'Failed to authenticate user due to an AttributeError'}, status=500)
+        except KeyError as error:
+            ErrorLog('', 'KeyError', str(error), '/save_logs')
+            return JsonResponse({'message': 'Failed to authenticate user due to a KeyError'}, status=500)
+        except json.JSONDecodeError as error:
+            ErrorLog('', 'JSONDecodeError', str(error), '/save_logs')
+            return JsonResponse({'message': 'Failed to authenticate user due to a JSONDecodeError'}, status=500)
+        except Exception as error:
+            ErrorLog('', 'ERROR UNDEFINED', str(error), '/save_logs')
+            return JsonResponse({'message': 'Failed to authenticate user'}, status=500)
+    else:
+        ErrorLog('', 'Method not allowed', 'Se ha intentado acceder a save_logs mediante un method que no es POST', '/save_logs')
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
 
 @api_view(['POST'])
 def refresh_token(request):
     if request.method == 'POST':
-        refresh_token = request.data.get('refreshToken')
-        if not refresh_token:
-            return Response({'error': 'Missing refresh token'}, status=status.HTTP_400_BAD_REQUEST)
-
         try:
+            refresh_token = request.data.get('refreshToken')
+            if not refresh_token:
+                WarningLog('', 'refresh_token', 'Token de actualización no encontrado', '/refresh_token')
+                return Response({'error': 'Refresh token not found'}, status=status.HTTP_400_BAD_REQUEST)
+
             # Validar el token de actualización
-            token = RefreshToken(refresh_token)
+            try:
+                token = RefreshToken(refresh_token)
+            except TokenError as e:
+                WarningLog('', 'Invalid token', 'Token de actualización inválido', '/refresh_token')
+                return Response({'error': 'Invalid refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
+
             token_payload = token.payload
 
             # Obtener el usuario asociado al token de actualización
             user = authenticate(request, id=token_payload.get('user_id'))
 
-            if user:
-                access_token = token.access_token
+            if not user:
+                WarningLog('', 'User not found', 'Usuario no encontrado con el id extraido del token', '/refresh_token')
+                return Response({'error': 'User not found'}, status=status.HTTP_404_NOT_FOUND)
 
-                InfoLog(user, 'refresh_token', 'Token refrescado exitosamente', '/refresh_token')
-                return Response({'token': str(access_token)}, status=status.HTTP_200_OK)
-            else:
-                WarningLog(None, 'refresh_token', 'Token de actualización inválido', '/refresh_token')
-                return Response({'error': 'Invalid refresh token'}, status=status.HTTP_401_UNAUTHORIZED)
+            access_token = token.access_token
+
+            InfoLog(user.email, 'refresh token', 'Token refrescado exitosamente', '/refresh_token')
+            return Response({'token': str(access_token)}, status=status.HTTP_200_OK)
 
         except Exception as e:
-            FatalLog(None, 'refresh_token', 'Error al refrescar el token', '/refresh_token')
+            FatalLog('', 'Refresh token error', 'Error al refrescar el token', '/refresh_token')
             return Response({'error': 'Failed to refresh token'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     else:
-        return Response({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+        ErrorLog('', 'Method not allowed', 'Se ha intentado acceder a refresh_token mediante un method que no es POST', '/refresh_token')
+        return JsonResponse({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
     
 @api_view(['GET'])
 def user_details(request):
     if request.method == 'GET':
         try:
             authorization_header = request.headers.get('Authorization')
+
             if not authorization_header:
+                ErrorLog('', 'Missing Auth Header', 'Falta la cabecera de autorización', '/user_details')
                 return JsonResponse({'error': 'Authorization header missing'}, status=400)
 
             token = authorization_header.split(' ')[1]
 
-            access_token = AccessToken(token)
+            try:
+                access_token = AccessToken(token)
+            except TokenError:
+                ErrorLog('', 'Invalid token', 'Token de acceso inválido', '/user_details')
+                return JsonResponse({'error': 'Invalid access token'}, status=status.HTTP_401_UNAUTHORIZED)
+
             user_id = access_token.payload.get('user_id')
 
-            user_profile = UserProfile.objects.get(user_id=user_id)
+            try:
+                user_profile = UserProfile.objects.get(user_id=user_id)
+
+            except UserProfile.DoesNotExist:
+                ErrorLog('', 'User profile not found', 'Perfil de usuario no encontrado con id={}'.format(user_id), '/user_details')
+                return JsonResponse({'error': 'User profile not found'}, status=status.HTTP_404_NOT_FOUND)
 
             user_data = {
                 'id': user_profile.user_id,
@@ -456,25 +577,28 @@ def user_details(request):
                 'surname2': user_profile.surname2,
                 'role': user_profile.role.id,
                 'date_of_birth': user_profile.date_of_birth,
-                'center': user_profile.center,
+                'center': user_profile.center.name,
                 'cycle': user_profile.cycle,
                 'image': str(user_profile.image) if user_profile.image else None,
                 'dni': user_profile.dni,
             }
 
-            InfoLog(user_profile.user, 'user_details', 'Detalles de usuario obtenidos exitosamente', '/user_details')
+            InfoLog(user_profile.user.email, 'User Details Retrieved', 'Detalles de usuario obtenidos exitosamente', '/user_details')
             return JsonResponse(user_data, status=200)
 
         except UserProfile.DoesNotExist:
-            ErrorLog(None, 'user_details', 'Perfil de usuario no encontrado', '/user_details')
+            ErrorLog('', 'User Profile Not Found', 'Perfil de usuario no encontrado', '/user_details')
             return JsonResponse({'error': 'User profile not found'}, status=404)
 
         except Exception as error:
-            ErrorLog(None, 'user_details', 'Error al obtener detalles de usuario', '/user_details')
+            ErrorLog('', 'User Details Retrieval Error', 'Error al obtener detalles de usuario: {}'.format(error), '/user_details')
             return JsonResponse({'error': 'Failed to get user details'}, status=500)
 
     else:
+        ErrorLog('', 'Invalid Method', 'Método no permitido', '/user_details')
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+
+from rest_framework import status
 
 @api_view(['POST']) 
 def update_data_user(request):
@@ -485,37 +609,189 @@ def update_data_user(request):
             
             if 'email_change' in user_data:
                 user_profile.email = user_data.get('email_change')
+                InfoLog(user_data.get('username'), 'Email modifyed', 'Se ha modificado el email del usuario {} a {}'.format(user_profile.username, user_data.get("email")), '/update_data_user')
+
             if 'first_name' in user_data:
+                InfoLog(user_data.get('username'), 'Name modifyed', 'Se ha modificado el nombre del usuario {} a {}'.format(user_profile.name, user_data.get("first_name")), '/update_data_user')
                 user_profile.name = user_data.get('first_name')
             if 'surname' in user_data:
                 user_profile.surname = user_data.get('surname')
+                InfoLog(user_data.get('username'), 'Last name modifyed', 'Se ha modificado el primer apellido del usuario {} a {}'.format(user_profile.surname, user_data.get("last_name")), '/update_data_user')
+
             if 'surname2' in user_data:
                 user_profile.surname2 = user_data.get('surname2')
+                InfoLog(user_data.get('username'), 'Second last name modifyed', 'Se ha modificado el segundo apellido del usuario {} a {}'.format(user_profile.surname2, user_data.get("second_last_name")), '/update_data_user')
+
 
             user_profile.save()
-            return JsonResponse({'message': 'User data updated successfully'}, status=200)
+
+            InfoLog(user_data.get('username'), 'User Update', 'Datos de usuario actualizados exitosamente', '/update_data_user')
+            return JsonResponse({'message': 'User data updated successfully'}, status=status.HTTP_200_OK)
         except User.DoesNotExist:
-            return JsonResponse({'message': 'User does not exist'}, status=404)
+            ErrorLog('', 'User Not Found', 'Usuario no encontrado durante la actualización', '/update_data_user')
+            return JsonResponse({'message': 'User does not exist'}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as error:
+            ErrorLog('', 'User Update Error', 'Error al actualizar los datos del usuario: {}. ERROR: {}'.format(str(user_data.get('username')), error), '/update_data_user')
+            return JsonResponse({'error': 'Failed to update user data'}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        ErrorLog('', 'Invalid Method', 'Método no permitido en /update_data_user', '/update_data_user')
+        return JsonResponse({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
 
 @api_view(['POST'])
 def verify_password(request):
     if request.method == 'POST':
-        data = json.loads(request.body)
-        print(request.body)
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            ErrorLog('', 'JSONDecodeError', 'Error al decodificar el JSON del cuerpo de la petición', '/verify_password')
+            return JsonResponse({'error': 'Failed to decode JSON'}, status=status.HTTP_400_BAD_REQUEST)
+
+    
         email = data.get('email')
         password = data.get('password')
 
+        if not email or not password:
+            ErrorLog('', 'Missing Data', 'Faltan datos de email o contraseña', '/verify_password')
+            return JsonResponse({'error': 'Email or password data missing'}, status=status.HTTP_400_BAD_REQUEST)
+
         user = authenticate(request, username=email, password=password)
         if user is not None and user.is_active:
-            return JsonResponse({'isValid': True}, status=200)
+            InfoLog(email, 'Password Verification', 'Verificación de contraseña exitosa', '/verify_password')
+            return JsonResponse({'isValid': True}, status=status.HTTP_200_OK)
         else:
-            print('verify_password -> Incorrect password')
-            return JsonResponse({'isValid': False}, status=401)
+            ErrorLog('', 'Incorrect Password', 'Contraseña incorrecta para el usuario: {}'.format(email), '/verify_password')
+            return JsonResponse({'isValid': False}, status=status.HTTP_401_UNAUTHORIZED)
     else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+        ErrorLog('', 'Invalid Method', 'Método no permitido en /verify_password', '/verify_password')
+        return JsonResponse({'error': 'Method not allowed'}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
     
+from rest_framework import status
+
+
+
+
+
+@api_view(['POST'])
+def send_password_reset_email(request):
+    try:
+        email = request.data['email']
+        user = User.objects.get(email=email)
+        user_profile = UserProfile.objects.get(user=user)
+    except User.DoesNotExist:
+        ErrorLog('', 'User Not Found', 'No existe un usuario con el correo electrónico {}'.format(email), '/send_password_reset_email')
+        return Response({'error': 'No existe un usuario con ese correo electrónico'}, status=404)
+    except KeyError:
+        ErrorLog('', 'Missing Email', 'No se proporcionó un correo electrónico', '/send_password_reset_email')
+        return Response({'error': 'No se proporcionó un correo electrónico'}, status=400)
+    
+
+    token = default_token_generator.make_token(user)
+    uid = urlsafe_base64_encode(force_bytes(user.pk))
+    mail_subject = 'Restabliment de Contrasenya'
+
+    message = f"""
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <style>
+            body {{
+                font-family: Arial, sans-serif;
+                background-color: #f2f2f2;
+                margin: 0;
+                padding: 0;
+            }}
+            .container {{
+                max-width: 600px;
+                margin: 50px auto;
+                background-color: #fff;
+                padding: 20px;
+                border-radius: 10px;
+                box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            }}
+            h1 {{
+                color: #333;
+                text-align: center;
+            }}
+            p {{
+                color: #666;
+                text-align: center;
+            }}
+            p span {{
+                text-align: right;
+            }}
+            .container > div {{
+                display: flex;
+                justify-content: center;
+            }}
+            .container > div > a {{
+                display: inline-block;
+                background-color: #4CAF50;
+                color: white;
+                padding: 10px 20px;
+                text-align: center;
+                text-decoration: none;
+                border-radius: 5px;
+                margin: 20px auto;
+                cursor: pointer;
+            }}
+            a:hover {{
+                background-color: #45a049;
+            }}
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Hola {user_profile.name} {user_profile.surname},</h1>
+            <p>Per restablir la contrasenya, si us plau fes clic al botó de sota:</p>
+            <div>
+                <a href="{env.str('DOMINIO')}/reset-password/{uid}/{token}">Restablir Contrasenya</a>
+            </div>
+            <p>Si no has sol·licitar un restabliment de contrasenya, si us plau ignora aquest correu electrònic.</p>
+            <br>
+            <p>Gràcies,<br>El teu equip de la Biblioteca M. Carmen Brito</p>
+        </div>
+    </body>
+    </html>
+    """
+
+    try:
+        send_mail(
+            subject=mail_subject,
+            message='',
+            from_email='biblIETI - Biblioteca M. Carmen Brito',
+            recipient_list=[email],
+            html_message=message,
+        )
+        InfoLog(email, 'Password Reset Email', 'Correo electrónico de restablecimiento de contraseña enviado exitosamente', '/send_password_reset_email')
+    except BadHeaderError:
+        ErrorLog('', 'Bad Header Error', 'Error al enviar el correo electrónico', '/send_password_reset_email')
+        return Response({'error': 'Ocurrió un error al enviar el correo electrónico'}, status=500)
+    return Response({'success': 'Correo electrónico de restablecimiento de contraseña enviado exitosamente'}, status=200)
+
+@api_view(['POST'])
+def reset_password(request):
+    try:
+        uid = force_str(urlsafe_base64_decode(request.data['uid']))
+        token = request.data['token']
+        user = User.objects.get(pk=uid)
+    except(TypeError, ValueError, OverflowError, User.DoesNotExist):
+        ErrorLog('', 'Invalid Token', 'El enlace para restablecer la contraseña no es válido', '/reset_password')
+        return JsonResponse({'error': 'El enlace para restablecer la contraseña no es válido'}, status=401)
+
+    if default_token_generator.check_token(user, token):
+        try:
+            new_password = request.data['newPassword']
+        except KeyError:
+            ErrorLog('', 'Missing Password', 'No se proporcionó una nueva contraseña', '/reset_password')
+            return JsonResponse({'error': 'No se proporcionó una nueva contraseña'}, status=402)
+        user.set_password(new_password)
+        user.save()
+        InfoLog(user.email, 'Password Reset', 'Contraseña restablecida con éxito', '/reset_password')
+        return JsonResponse({'message': 'Contraseña restablecida con éxito'}, status=200)
+    else:
+        return JsonResponse({'error': 'El enlace para restablecer la contraseña no es válido'}, status=403)
+
+
 @api_view(['POST'])
 def save_password(request):
     if request.method == 'POST':
