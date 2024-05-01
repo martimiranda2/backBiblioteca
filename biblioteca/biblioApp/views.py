@@ -890,7 +890,7 @@ def save_csv(request):
 
             if not error:
                 saves += 1
-                user = User.objects.create_user(username=name+surname, email=email, password="biblioteca")
+                user = User.objects.create_user(username=email, email=email, password="biblioteca")
                 user_profile = UserProfile.objects.create(
                     user=user,
                     name=name,
