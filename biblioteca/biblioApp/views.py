@@ -868,13 +868,19 @@ def save_csv(request):
                 error = True
                 errors.append({'error':'El email del registre '+ id_register+' no es valid'})
 
+            if User.objects.filter(username=email).exists():
+                if UserProfile.objects.filter(email=email,name=name,surname=surname,surname2=surname2,phone=phone,cycle=cycle).exists():
+                    error = True
+                else:
+                    error = True
+                    errors.append({'error':'ERROR al registre '+ id_register+': ja existeix un usuari amb email '+email})
 
             if UserProfile.objects.filter(email=email).exists():
                 if UserProfile.objects.filter(email=email,name=name,surname=surname,surname2=surname2,phone=phone,cycle=cycle).exists():
                     error = True
                 else:
                     error = True
-                    errors.append({'error':'El email del registre '+ id_register+' ja existeix com a usuari'})
+                    errors.append({'error':'ERROR al registre '+ id_register+': ja existeix un usuari amb email '+email})
 
 
             if phone:
