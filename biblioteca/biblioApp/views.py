@@ -89,10 +89,13 @@ def change_user_data_admin(request):
         email_user = data.get('email_user')
         user_admin = UserProfile.objects.filter(email=email_admin).first()
         user_change = UserProfile.objects.filter(email=email_user).first()
+
+        print('change_user_data_admin -> user_admin:', user_admin)
+        print('change_user_data_admin -> user_change:', user_change)
         
         if user_admin is not None and user_change is not None:
             role_admin = user_admin.role.name
-            if role_admin == 'bibliotecari':
+            if role_admin == 'bibliotecari' or role_admin == 'admin':
                 user_change.name = data.get('name', user_change.name)
                 user_change.surname = data.get('surname', user_change.surname)
                 user_change.surname2 = data.get('surname2', user_change.surname2)
@@ -391,7 +394,40 @@ def get_user_profile_by_email(email):
         user_profile = UserProfile.objects.get(email=email)
         return user_profile
     except UserProfile.DoesNotExist:
-        Warning('', 'User not found', 'Usuario no encontrado con el mail: {}'.format(email), '/get_user_by_id')
+        Warning('', 'User not found', 'Usuario no encontrado con el mail: {}'.format(email), '/get_user_profile_by_email')
+        raise UserProfile.DoesNotExist
+    
+def get_user_profile_by_id(id):
+    try:
+        user_profile = UserProfile.objects.get(id=id)
+        return user_profile
+    except UserProfile.DoesNotExist:
+        Warning('', 'User not found', 'Usuario no encontrado con el id: {}'.format(id), '/get_user_profile_by_id')
+        raise UserProfile.DoesNotExist
+    
+@api_view(['POST'])
+def get_user_by_id_to_update(request):
+    try:
+        print('get_user_profile_by_id -> request')
+        data = json.loads(request.body)
+        id = data.get('id')
+        user_profile = UserProfile.objects.get(id=id)
+
+        user_data = {
+                'email': user_profile.user.email,
+                'name': user_profile.name,
+                'surname': user_profile.surname,
+                'surname2': user_profile.surname2,
+                'role': user_profile.role.id,
+                'date_of_birth': user_profile.date_of_birth,
+                'center': user_profile.center.name,
+                'cycle': user_profile.cycle,
+                'image': str(user_profile.image) if user_profile.image else None,
+                'dni': user_profile.dni,
+            }
+        return JsonResponse({'user_profile': user_data}, status=201)
+    except UserProfile.DoesNotExist:
+        Warning('', 'User not found', 'Usuario no encontrado con el id: {}'.format(id), '/get_user_profile_by_id')
         raise UserProfile.DoesNotExist
 
 @api_view(['GET'])
