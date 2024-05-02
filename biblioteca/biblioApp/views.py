@@ -190,9 +190,10 @@ def obtain_item_data(request,idItem):
     
     except Item.DoesNotExist:
         return JsonResponse({'error': 'Item does not exist'}, status=404)
+
 @csrf_exempt
-def search_items_availables(request):
-    query = request.GET.get('item', '')
+def search_items_availables(request, search):
+    query = search
     print('search_items -> query:', query)
 
     results = []
@@ -204,14 +205,11 @@ def search_items_availables(request):
     for model, fields in models_to_search:
         for field in fields:
             filter_kwargs = {f"{field}__icontains": query}
-            model_results = model.objects.filter(**filter_kwargs)[:5]
+            model_results = model.objects.filter(**filter_kwargs)[:25]  # Limitar a 25 resultados
             for obj in model_results:
                 if obj.loan_available:
                     if ItemCopy.objects.filter(item=obj, status='Available').exists():
                         results.append({'id': obj.id, 'name': str(obj)})
-                        if len(results) >= 5:
-                            return JsonResponse(results, safe=False)
-
     return JsonResponse(results, safe=False)
 
 @csrf_exempt
@@ -848,8 +846,8 @@ def save_password(request):
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
 @api_view(['GET'])
-def search_items(request):
-    query = request.GET.get('item', '')
+def search_items(request, search):
+    query = search
     print('search_items -> query:', query)
 
     results = []
@@ -861,12 +859,9 @@ def search_items(request):
     for model, fields in models_to_search:
         for field in fields:
             filter_kwargs = {f"{field}__icontains": query}
-            model_results = model.objects.filter(**filter_kwargs)[:5]
+            model_results = model.objects.filter(**filter_kwargs)[:25]  # Limitar a 25 resultados
             for obj in model_results:
                 results.append({'id': obj.id, 'name': str(obj)})
-                if len(results) >= 5:
-                    return JsonResponse(results, safe=False)
-
     return JsonResponse(results, safe=False)
 
 @api_view(['POST'])
