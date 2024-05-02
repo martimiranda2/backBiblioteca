@@ -23,6 +23,7 @@ urlpatterns = [
     path('user/save-users-csv/',views.save_csv, name='save_csv'),
     path('user/update/', views.update_data_user, name='update_data_user'),
     path('user/get-data/', views.get_user_by_id_to_update, name='get_user_by_id'),
+    path('user/search/<email>', views.get_user_by_email, name='get_user_by_email'),
 
     path('items/search/', views.search_items, name='search_items'),
     path('items/search/<idItem>/', views.obtain_item_data, name='obtain_item_data'),

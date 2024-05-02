@@ -508,6 +508,9 @@ def save_logs(request):
                     description = log_data.get('description')
                     route = log_data.get('route')
 
+                    if email is None:
+                        email = ''
+
                     Log.objects.create(
                         user=email,
                         log_level=log_level,
@@ -974,7 +977,31 @@ def make_loan(request):
     return JsonResponse({'message': 'Préstamo creado exitosamente'}, status=200)
 
 @csrf_exempt
+@api_view(['GET'])
 def obtain_item_copies(request,idItem):
-    item_copies = ItemCopy.objects.filter(item_id=idItem, status='Available')
+    item_copies = ItemCopy.objects.filter(item_id=idItem)
     copies_data = list(item_copies.values())  
     return JsonResponse({'copies': copies_data})
+
+@api_view(['GET'])
+def get_user_by_email(request, email):
+    print('search_items -> query:', email)
+
+    results = []
+
+    users_to_search = [
+        (UserProfile, ['email'])
+    ]
+
+    for model, fields in users_to_search:
+        for field in fields:
+            filter_kwargs = {f"{field}__icontains": email}
+            model_results = model.objects.filter(**filter_kwargs)
+            model_results = model_results.order_by('-email')[:5]  # Sort by email in descending order
+            for obj in model_results:
+                results.append({'id': obj.id, 'email': str(obj.email)})
+                if len(results) >= 5:
+                    return JsonResponse(results, safe=False)
+    
+    return JsonResponse(results, safe=False)  # Return the results even if less than 5 users are found
+    
