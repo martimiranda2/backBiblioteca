@@ -971,11 +971,18 @@ def make_loan(request):
 
     return JsonResponse({'message': 'Préstamo creado exitosamente'}, status=200)
 
-@csrf_exempt
-@api_view(['GET'])
-def obtain_item_copies(request,idItem):
+def obtain_item_copies(request, idItem):
     item_copies = ItemCopy.objects.filter(item_id=idItem)
-    copies_data = list(item_copies.values())  
+    copies_data = []
+    for copy in item_copies:
+        copy_data = {
+            'id': copy.id,
+            'status': copy.status,
+            'center_name': copy.center.name if copy.center else None,  # Obtener el nombre del centro si existe
+            'item_id':idItem,
+            'id_copy':copy.id_copy
+        }
+        copies_data.append(copy_data)
     return JsonResponse({'copies': copies_data})
 
 @api_view(['GET'])
