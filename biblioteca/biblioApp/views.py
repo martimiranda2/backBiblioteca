@@ -723,6 +723,7 @@ def send_password_reset_email(request):
         return Response({'error': 'No se proporcionó un correo electrónico'}, status=400)
     except Exception as error:
         ErrorLog('', 'ERROR UNDEFINED', str(error), '/send_password_reset_email')
+        return Response({'error': error}, status=500)
     
 
     token = default_token_generator.make_token(user)
@@ -848,6 +849,24 @@ def save_password(request):
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
     
+@api_view(['GET'])
+def autocomplete_search_items(request, query):
+    print('search_items -> query:', query)
+
+    results = []
+
+    models_to_search = [
+        (Item, ['title', 'material_type', 'signature'])
+    ]
+
+    for model, fields in models_to_search:
+        for field in fields:
+            filter_kwargs = {f"{field}__icontains": query}
+            model_results = model.objects.filter(**filter_kwargs)[:5]  # Limitar a 25 resultados
+            for obj in model_results:
+                results.append({'id': obj.id, 'name': str(obj)})
+    return JsonResponse(results, safe=False)
+
 @api_view(['GET'])
 def search_items(request, search):
     query = search

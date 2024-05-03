@@ -25,6 +25,7 @@ urlpatterns = [
     path('user/get-data/', views.get_user_by_id_to_update, name='get_user_by_id'),
     path('user/search/<email>', views.get_user_by_email, name='get_user_by_email'),
 
+    path('items/autocompleat-search/<query>', views.autocomplete_search_items, name='search_5_items'),
     path('items/search-items/<search>/', views.search_items, name='search_items'),
     path('items/search/<idItem>/', views.obtain_item_data, name='obtain_item_data'),
     path('items/search-item-copies/<idItem>/', views.obtain_item_copies, name='obtain_item_copies'),
