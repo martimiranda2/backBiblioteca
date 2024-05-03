@@ -224,7 +224,7 @@ def get_token_by_email_and_password(email, password):
 
         token_data = {
             'id': user.id,
-            'email': user.username,
+            'email': userP.email,
             'refresh': str(refresh),
             'access': str(refresh.access_token),
         }
@@ -608,7 +608,7 @@ def user_details(request):
             user_data = {
                 'id': user_profile.user_id,
                 'username': user_profile.user.username,
-                'email': user_profile.user.email,
+                'email': user_profile.email,
                 'name': user_profile.name,
                 'surname': user_profile.surname,
                 'surname2': user_profile.surname2,
