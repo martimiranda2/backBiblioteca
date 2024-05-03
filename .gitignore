@@ -1,5 +1,6 @@
 *.pyc
 /env/
+/migrations/
 /venv/
 /static/*
 /media/*
