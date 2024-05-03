@@ -712,13 +712,8 @@ from rest_framework import status
 def send_password_reset_email(request):
     try:
         email = request.data['email']
-        print('send_password_reset_email -> email:', email)
-
-        user = User.objects.get(email=email)
-        print('send_password_reset_email -> user:', user)
-
-        user_profile = UserProfile.objects.get(user=user)
-        print('send_password_reset_email -> user_profile:', user_profile)
+        user_profile = UserProfile.objects.get(email=email)
+        user = user_profile.user
 
     except User.DoesNotExist:
         ErrorLog('', 'User Not Found', 'No existe un usuario con el correo electrónico {}'.format(email), '/send_password_reset_email')
@@ -726,6 +721,8 @@ def send_password_reset_email(request):
     except KeyError:
         ErrorLog('', 'Missing Email', 'No se proporcionó un correo electrónico', '/send_password_reset_email')
         return Response({'error': 'No se proporcionó un correo electrónico'}, status=400)
+    except Exception as error:
+        ErrorLog('', 'ERROR UNDEFINED', str(error), '/send_password_reset_email')
     
 
     token = default_token_generator.make_token(user)
