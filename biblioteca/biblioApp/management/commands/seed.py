@@ -20,6 +20,16 @@ class Command(BaseCommand):
     def handle(self, *args, **kwargs):
         seed()
 
+
+
+def create_centers():
+    num_centros = Center.objects.count()
+
+    if num_centros < 4:
+        for i in range(4 - num_centros):
+            nombre_centro = fake.company()
+            Center.objects.create(name=nombre_centro)
+
 def create_rols():
     roles_data = [
         {"name": "admin"},
@@ -156,11 +166,16 @@ def create_dispositives(num_dispositives=10):
 
 def create_item_copies(num_copies=600):
     items = Item.objects.all()
+    centers = Center.objects.all()
     for _ in range(num_copies):
         item = random.choice(items)
         status = random.choice(["Available"])
         id_copy = fake.uuid4()
-        ItemCopy.objects.create(item=item, status=status, id_copy=id_copy)
+        center = random.choice(centers)
+        if center:
+            ItemCopy.objects.create(item=item, status=status, id_copy=id_copy, center=center)
+        else:
+            print("No hay centros disponibles para asignar al ItemCopy.")
 
 def create_loans(num_loans=200):
     users = UserProfile.objects.all()
@@ -192,6 +207,7 @@ def create_loans(num_loans=200):
 
 
 def seed():
+    create_centers()
     if not Role.objects.exists():
         create_rols()
     create_users()

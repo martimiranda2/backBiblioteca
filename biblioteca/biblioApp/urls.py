@@ -25,10 +25,11 @@ urlpatterns = [
     path('user/get-data/', views.get_user_by_id_to_update, name='get_user_by_id'),
     path('user/search/<email>', views.get_user_by_email, name='get_user_by_email'),
 
-    path('items/search/', views.search_items, name='search_items'),
+    path('items/search-items/<search>/', views.search_items, name='search_items'),
     path('items/search/<idItem>/', views.obtain_item_data, name='obtain_item_data'),
     path('items/search-item-copies/<idItem>/', views.obtain_item_copies, name='obtain_item_copies'),
-    path('items/search-availables/', views.search_items_availables, name='search_items_availables'),
+    path('items/search-availables/<search>/', views.search_items_availables, name='search_items_availables'),
+
     path('items/make-loan/', views.make_loan, name='make_loan'),
     
     path('logs/save/', views.save_logs, name='save_log'),

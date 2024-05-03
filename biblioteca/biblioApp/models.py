@@ -123,6 +123,7 @@ class ItemCopy(models.Model):
     item = models.ForeignKey(Item, on_delete=models.CASCADE , verbose_name="Item")
     status = models.CharField(max_length=20, default='Available' , verbose_name="Disponibilitat")
     id_copy = models.CharField(max_length=100, verbose_name="Id del exemplar")
+    center = models.ForeignKey(Center, on_delete=models.CASCADE, verbose_name="Centre")
 
 
     class Meta:
@@ -194,7 +195,11 @@ class Log(models.Model):
         return self.user+" "+self.description
 
 
-
+def get_default_center_id():
+    try:
+        return Center.objects.first().id
+    except ObjectDoesNotExist:
+        return None
 
 
 
