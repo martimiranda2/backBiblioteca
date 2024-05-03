@@ -648,7 +648,7 @@ def update_data_user(request):
             
             if 'email_change' in user_data:
                 user_profile.email = user_data.get('email_change')
-                InfoLog(user_data.get('username'), 'Email modifyed', 'Se ha modificado el email del usuario {} a {}'.format(user_profile.username, user_data.get("email")), '/update_data_user')
+                InfoLog(user_data.get('username'), 'Email modifyed', 'Se ha modificado el email del usuario {} a {}'.format(user_profile.email, user_data.get("email")), '/update_data_user')
 
             if 'first_name' in user_data:
                 InfoLog(user_data.get('username'), 'Name modifyed', 'Se ha modificado el nombre del usuario {} a {}'.format(user_profile.name, user_data.get("first_name")), '/update_data_user')
@@ -714,8 +714,14 @@ from rest_framework import status
 def send_password_reset_email(request):
     try:
         email = request.data['email']
+        print('send_password_reset_email -> email:', email)
+
         user = User.objects.get(email=email)
+        print('send_password_reset_email -> user:', user)
+
         user_profile = UserProfile.objects.get(user=user)
+        print('send_password_reset_email -> user_profile:', user_profile)
+
     except User.DoesNotExist:
         ErrorLog('', 'User Not Found', 'No existe un usuario con el correo electrónico {}'.format(email), '/send_password_reset_email')
         return Response({'error': 'No existe un usuario con ese correo electrónico'}, status=404)
