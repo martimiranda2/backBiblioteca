@@ -920,11 +920,13 @@ def search_items(request, search):
 @api_view(['POST'])
 def save_csv(request):
     saves = 0
+    errorsCount = 0
     json_data = json.loads(request.body)
     userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
     center = userAdmin.center
     role = get_object_or_404(Role, name='alumne')
     if userAdmin.role.name != 'bibliotecari' and userAdmin.role.name != 'admin':
+        ErrorLog(userAdmin.email, 'Invalid role', 'El rol del usuario admin no coincide con un bibliotecario o admin', '/save_csv')
         return JsonResponse({'error': 'email_admin no coincideix amb un usuari admin'}, status=400)
     user_profiles_data = json_data.get('user_profiles_csv', [])
     errors = []
@@ -938,68 +940,74 @@ def save_csv(request):
             phone = profile_data.get('telefon', '')
             cycle = profile_data.get('curs', '')
             id_register = str(profile_data.get('id_register', ''))
-            
-            if not name or not surname or any(char.isdigit() for char in name) or any(char.isdigit() for char in surname):
-                error = True
-                errors.append({'error':'El nom i el cognom del registre '+ id_register+' no poden estar buits ni contindre numeros'})
 
-        
-            if surname2 and any(char.isdigit() for char in surname2):
-                error = True
-                errors.append({'error':'El segon cognom del registre '+ id_register+' no pot  contindre cap número'})
-
-        
-            try:
-                validate_email(email)
-            except ValidationError:
-                error = True
-                errors.append({'error':'El email del registre '+ id_register+' no es valid'})
 
             if User.objects.filter(username=email).exists():
-                if UserProfile.objects.filter(email=email,name=name,surname=surname,surname2=surname2,phone=phone,cycle=cycle).exists():
-                    error = True
-                else:
-                    error = True
-                    errors.append({'error':'ERROR al registre '+ id_register+': ja existeix un usuari amb email '+email})
-
-            if UserProfile.objects.filter(email=email).exists():
-                if UserProfile.objects.filter(email=email,name=name,surname=surname,surname2=surname2,phone=phone,cycle=cycle).exists():
-                    error = True
-                else:
-                    error = True
-                    errors.append({'error':'ERROR al registre '+ id_register+': ja existeix un usuari amb email '+email})
-
-
-            if phone:
-                if not any(char.isdigit() for char in phone):
-                    error = True
-                    errors.append({'error': 'El telefon del registre ' + id_register + ' ha de contidre només números'})
-
-
-
-            if not cycle:
                 error = True
-                errors.append({'error':'El curs del registre '+ id_register+' no pot estar buit'})
-
-            if not error:
-                saves += 1
-                user = User.objects.create_user(username=email, email=email, password="biblioteca")
-                user_profile = UserProfile.objects.create(
-                    user=user,
-                    name=name,
-                    surname=surname,
-                    surname2=surname2,
-                    email=email,
-                    phone=phone,
-                    cycle=cycle,
-                    center=center,
-                    role=role
-                )
-                user_profile.save()
+                errors.append(f'ATENCIÓ -> Registre {id_register}: ja existeix un usuari amb email {email}')
+                WarningLog(userAdmin.email, 'User already exists', f'Error en el registro {id_register}. Ya existe un usuario con el email {email}', '/save_csv')
             
+            else:
+                if not name or not surname or any(char.isdigit() for char in name) or any(char.isdigit() for char in surname):
+                    error = True
+                    errors.append({f'ERROR al registre {id_register}. El nom i el cognom són obligatoris i no poden contenir números: {name} | {surname}'})
+                    WarningLog(userAdmin.email, 'Invalid name or surname', f'Error en el registro {id_register}. El name y surname son obligatorios y no pueden contener números: {name} | {surname}', '/save_csv')
+            
+                if surname2 and any(char.isdigit() for char in surname2):
+                    error = True
+                    errors.append({f'ERROR al registre {id_register}. El segon cognom no pot contenir números: {surname2}'})
+                    WarningLog(userAdmin.email, 'Invalid surname2', f'Error en el registro {id_register}. El surname2 solo puede contener letras: {surname2}', '/save_csv')
+            
+                try:
+                    validate_email(email)
+                except ValidationError:
+                    error = True
+                    errors.append({f'ERROR al registre {id_register}. L\'email introduit és invàlid: {email}'})
+                    WarningLog(userAdmin.email, 'Invalid email', f'Error en el registro {id_register}. El email introducido es inválido: {email}', '/save_csv')
+
+            
+
+                if UserProfile.objects.filter(email=email).exists():
+                    error = True
+                    errors.append({f'ERROR al registre {id_register}. Ja existeix un usuari amb email {email}'})
+                    WarningLog(userAdmin.email, 'User already exists', f'Error en el registro {id_register}. Ya existe un usuario con el email {email}', '/save_csv')
+
+                if not cycle:
+                    error = True
+                    errors.append({f'ERROR al registre {id_register}. No s\'ha especificat el curs del registre'})
+                    WarningLog(userAdmin.email, 'Empty cycle', f'Error en el registro {id_register}. El cycle es obligatorio.', '/save_csv')
+
+                if not error:
+                    try:
+                        user = User.objects.create_user(username=email)
+                        user.set_password("biblioteca")
+
+                        user_profile = UserProfile.objects.create(
+                            user=user,
+                            name=name,
+                            surname=surname,
+                            surname2=surname2,
+                            email=email,
+                            phone=phone,
+                            cycle=cycle,
+                            center=center,
+                            role=role
+                        )
+                        user_profile.save()
+                        saves += 1
+                        InfoLog(userAdmin.email, 'User saved', f'Usuario guardado correctamente. Registro {id_register}', '/save_csv')
+                    except Exception as e:
+                        errors.append({f'ERROR al registre {id_register}. {str(e)}'})
+                        ErrorLog(userAdmin.email, 'Error saving user', f'Error en el registro {id_register}. ERROR: {str(e)}', '/save_csv')
+                        errorsCount += 1
+                else:
+                    errorsCount += 1
         
-        return JsonResponse({'message':str(saves)+' usuaris afegits correctament','errors':errors}, status=201)
+        InfoLog(userAdmin.email, 'CSV saved', f'Se ha procesado el CSV correctamente. Numero de usuarios guardados: {saves}. Número de registros erroneos: {errorsCount}', '/save_csv')
+        return JsonResponse({'saves': saves, 'errors': [str(error) for error in errors], 'errorsCount': errorsCount}, status=201)
+
     else:
+        ErrorLog(userAdmin.email, 'Method not allowed', 'Método no permitido en /save_csv. Debe ser POST', '/save_csv')
         return JsonResponse({'error': 'Only POST requests are allowed'}, status=400)
 
 @api_view(['POST'])
