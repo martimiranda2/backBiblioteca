@@ -83,35 +83,69 @@ def show_users(request):
 
 @api_view(['POST'])
 def change_user_data_admin(request):
-    if request.method == 'POST':
-        data = json.loads(request.body)
-        email_admin = data.get('email_admin')
-        email_user = data.get('email_user')
-        user_admin = UserProfile.objects.filter(email=email_admin).first()
-        user_change = UserProfile.objects.filter(email=email_user).first()
+    try:
+        if request.method == 'POST':
+            data = json.loads(request.body)
 
-        print('change_user_data_admin -> user_admin:', user_admin)
-        print('change_user_data_admin -> user_change:', user_change)
-        
-        if user_admin is not None and user_change is not None:
-            role_admin = user_admin.role.name
-            if role_admin == 'bibliotecari' or role_admin == 'admin':
-                user_change.name = data.get('name', user_change.name)
-                user_change.surname = data.get('surname', user_change.surname)
-                user_change.surname2 = data.get('surname2', user_change.surname2)
-                user_change.dni = data.get('dni', user_change.dni)
-                user_change.phone = data.get('phone', user_change.phone)
-                user_change.date_of_birth = datetime.strptime(data.get('birth', user_change.date_of_birth), "%d-%m-%Y")
-                user_change.cycle = data.get('cycle', user_change.cycle)
-                user_change.save()
-                
-                return JsonResponse({'message': 'User data updated successfully'}, status=200)
+            email_admin = data.get('email_admin')
+            email_user = data.get('email_user')
+
+            user_admin = UserProfile.objects.filter(email=email_admin).first()
+            user_change_obj = UserProfile.objects.filter(email=email_user).first()
+
+            if user_admin is not None and user_change_obj is not None:
+                role_admin = user_admin.role.name
+
+                if role_admin == 'bibliotecari' or role_admin == 'admin':
+                    user_change = data.get('user_change')
+
+                    if 'username' in user_change and user_change['username'] is not None:
+                        user_change_obj.user.username = user_change['username']
+                    if 'name' in user_change and user_change['name'] is not None:
+                        user_change_obj.name = user_change['name']
+                    if 'surname' in user_change and user_change['surname'] is not None:
+                        user_change_obj.surname = user_change['surname']
+                    if 'surname2' in user_change and user_change['surname2'] is not None:
+                        user_change_obj.surname2 = user_change['surname2']
+                    if 'birth' in user_change and user_change['birth'] is not None:
+                        user_change_obj.date_of_birth = datetime.strptime(user_change['birth'], "%d-%m-%Y")
+                    if 'cycle' in user_change and user_change['cycle'] is not None:
+                        user_change_obj.cycle = user_change['cycle']
+                    if 'dni' in user_change and user_change['dni'] is not None:
+                        user_change_obj.dni = user_change['dni']
+                    if 'phone' in user_change and user_change['phone'] is not None:
+                        user_change_obj.phone = user_change['phone']
+                    if 'email' in user_change and user_change['email'] is not None:
+                        user_change_obj.email = user_change['email']
+                    if 'password' in user_change and user_change['password'] is not None:
+                        user_change_obj.user.set_password(user_change['password'])
+                    
+
+                    user_change_obj.save()
+
+                    InfoLog(email_admin, 'User data updated', f'Datos del usuario {email_user} actualizados exitosamente', '/change_user_data_admin')
+                    return JsonResponse({'message': 'User data updated successfully'}, status=200)
+                else:
+                    ErrorLog(email_admin, 'User is not an admin', f'El usuario {email_admin} no tiene permisos para modificar los datos de otros usuarios', '/change_user_data_admin')
+                    return JsonResponse({'error': 'User is not an admin'}, status=400)
             else:
-                return JsonResponse({'error': 'User is not an admin'}, status=400)
+                if (user_admin is None):
+                    ErrorLog(email_admin, 'Admin not found', f'Usuario administrador no encontrado con el email {email_admin}', '/change_user_data_admin')
+                    return JsonResponse({'error': 'Admin not found'}, status=400)
+                if (user_change_obj is None):
+                    ErrorLog(email_admin, 'User not found', f'Usuario no encontrado con el email {email_user}', '/change_user_data_admin')
+                    return JsonResponse({'error': 'User not found'}, status=400)
         else:
-            return JsonResponse({'error': 'User not found'}, status=400)
-    else:
-        return JsonResponse({'error': 'Method not allowed'}, status=405)
+            ErrorLog(email_admin, 'Method not allowed', 'Se ha intentado acceder a change_user_data_admin mediante un method que no es POST', '/change_user_data_admin')
+            return JsonResponse({'error': 'Method not allowed'}, status=405)
+    except json.JSONDecodeError as json_error:
+        print(f"JSON Decode Error: {json_error}")
+        ErrorLog(email_admin, 'JSONDecodeError', str(json_error), '/change_user_data_admin')
+        return JsonResponse({'error': 'Invalid JSON format'}, status=400)
+    except Exception as error:
+        print(f"An error occurred: {error}")
+        ErrorLog(email_admin, 'ERROR UNDEFINED', str(error), '/change_user_data_admin')
+        return JsonResponse({'error': 'An error occurred'}, status=500)
 
 @api_view(['POST']) 
 def change_user_image(request):
@@ -395,38 +429,35 @@ def get_user_profile_by_email(email):
         Warning('', 'User not found', 'Usuario no encontrado con el mail: {}'.format(email), '/get_user_profile_by_email')
         raise UserProfile.DoesNotExist
     
-def get_user_profile_by_id(id):
+@api_view(['GET'])
+def get_user_profile_by_id(request, userId):
     try:
-        user_profile = UserProfile.objects.get(id=id)
-        return user_profile
-    except UserProfile.DoesNotExist:
-        Warning('', 'User not found', 'Usuario no encontrado con el id: {}'.format(id), '/get_user_profile_by_id')
-        raise UserProfile.DoesNotExist
-    
-@api_view(['POST'])
-def get_user_by_id_to_update(request):
-    try:
-        print('get_user_profile_by_id -> request')
-        data = json.loads(request.body)
-        id = data.get('id')
-        user_profile = UserProfile.objects.get(id=id)
+        user_profile = UserProfile.objects.get(id=userId)
 
         user_data = {
-                'email': user_profile.user.email,
-                'name': user_profile.name,
-                'surname': user_profile.surname,
-                'surname2': user_profile.surname2,
-                'role': user_profile.role.id,
-                'date_of_birth': user_profile.date_of_birth,
-                'center': user_profile.center.name,
-                'cycle': user_profile.cycle,
-                'image': str(user_profile.image) if user_profile.image else None,
-                'dni': user_profile.dni,
-            }
-        return JsonResponse({'user_profile': user_data}, status=201)
+            'username': user_profile.user.username,
+            'email': user_profile.user.email,
+            'name': user_profile.name,
+            'surname': user_profile.surname,
+            'surname2': user_profile.surname2,
+            'role': user_profile.role.id,
+            'date_of_birth': user_profile.date_of_birth,
+            'center': user_profile.center.name,
+            'cycle': user_profile.cycle,
+            'image': str(user_profile.image) if user_profile.image else None,
+            'dni': user_profile.dni,
+            'phone': user_profile.phone,
+        }
+
+        InfoLog(user_profile.user.email, 'User Profile Retrieved', f'Perfil de usuario obtenido exitosamente con el id: {userId}', '/get_user_profile_by_id')
+        return Response(user_data, status=200)
+    
     except UserProfile.DoesNotExist:
-        Warning('', 'User not found', 'Usuario no encontrado con el id: {}'.format(id), '/get_user_profile_by_id')
+        Warning('', 'User not found', 'Usuario no encontrado con el id: {}'.format(userId), '/get_user_profile_by_id')
         raise UserProfile.DoesNotExist
+    except Exception as error:
+        ErrorLog('', 'ERROR UNDEFINED', f'Error al intentar recuperar los datos del usuario con id: {userId}. ERROR: {error}', '/get_user_profile_by_id')
+        raise error
 
 @api_view(['GET'])
 def check_user_exists(request):

@@ -22,7 +22,7 @@ urlpatterns = [
     path('user/get_image/<int:user_id>/', views.get_user_image, name='get_user_image'),
     path('user/save-users-csv/',views.save_csv, name='save_csv'),
     path('user/update/', views.update_data_user, name='update_data_user'),
-    path('user/get-data/', views.get_user_by_id_to_update, name='get_user_by_id'),
+    path('user/get-data/<userId>', views.get_user_profile_by_id, name='get_user_profile_by_id'),
     path('user/search/<email>', views.get_user_by_email, name='get_user_by_email'),
 
     path('items/autocompleat-search/<query>', views.autocomplete_search_items, name='search_5_items'),

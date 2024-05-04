@@ -33,9 +33,8 @@ def create_centers():
 def create_rols():
     roles_data = [
         {"name": "admin"},
-        {"name": "alumne"},
-        {"name": "profesor"},
-        {"name": "bibliotecari"},
+        {"name": "biblio"},
+        {"name": "user"},
     ]
     for role_data in roles_data:
         Role.objects.create(**role_data)
