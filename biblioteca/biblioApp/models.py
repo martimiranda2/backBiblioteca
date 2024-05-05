@@ -55,6 +55,7 @@ class Item(models.Model):
     material_type = models.TextField(max_length=100, verbose_name="Material del que es composa")  
     signature = models.CharField(max_length=100, verbose_name="Signatura") 
     loan_available = models.BooleanField(default=True, verbose_name="Item disponible per prestar a alumnes")
+    
 
     class Meta:
         verbose_name = "Item del catàlog"
@@ -72,6 +73,7 @@ class Book (Item):
     publisher = models.CharField(max_length=100, verbose_name="Editorial")
     colection = models.CharField(max_length=100, verbose_name="Col·lecció")
     pages = models.PositiveIntegerField(verbose_name="Pàgines")
+    language = models.CharField(max_length=10, verbose_name="Idioma")
 
 
     class Meta:
@@ -85,7 +87,8 @@ class CD(Item):
     discography = models.CharField(max_length=100, verbose_name="Discografía")
     style = models.CharField(max_length=100, verbose_name="Estil")
     duration = models.TimeField(verbose_name="Duració")
-   
+    language = models.CharField(max_length=10, verbose_name="Idioma")
+
 
 
     class Meta:

@@ -26,7 +26,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework_simplejwt.exceptions import TokenError
 
-from .models import Book, CD, Loan, Item, Dispositive, Log, User, Role, UserProfile, ItemCopy
+from .models import Book, Center, CD, Loan, Item, Dispositive, Log, User, Role, UserProfile, ItemCopy
 
 from datetime import timedelta,datetime
 from rest_framework_simplejwt.settings import api_settings
@@ -1132,4 +1132,171 @@ def get_user_by_email(request, email):
                     return JsonResponse(results, safe=False)
     
     return JsonResponse(results, safe=False)  # Return the results even if less than 5 users are found
+
+
+
+
+
+
+@api_view(['POST'])
+def advajjjjnced_search(request):
+    json_data = json.loads(request.body)
+    item_type = json_data.get('item_type') #llibre, cd, dispositiu
+    search = json_data.get('search')
+    status = json_data.get('status') #Loaned, Available, Indiferent
+    center_id = json_data.get('center') #id del centre
+
+    item_copies = ItemCopy.objects.filter(center_id=center_id)
+
+    if item_type == 'llibre':
+        edition_date_start = json_data.get('edition_date_start')
+        edition_date_end = json_data.get('edition_date_end')
+        publisher = json_data.get('publisher')
+        language = json_data.get('language') #ca, en, es
+
+        item_copies = item_copies.filter(
+            item__title__icontains=search,
+            item__edition_date__range=(edition_date_start, edition_date_end),
+            item__publisher=publisher,
+            item__language=language
+        )
+
+    elif item_type == 'cd':
+        edition_date_start = json_data.get('edition_date_start')
+        edition_date_end = json_data.get('edition_date_end')
+        discography = json_data.get('discography')
+        language = json_data.get('language') #ca, en, es
+
+        item_copies = item_copies.filter(
+            item__title__icontains=search,
+            item__edition_date__range=(edition_date_start, edition_date_end),
+            item__cd__discography=discography,
+            item__language=language
+        )
+
+    elif item_type == 'dispositiu':
+        brand = json_data.get('brand')
+
+        item_copies = item_copies.filter(
+            item__title__icontains=search,
+            item__dispositive__brand=brand
+        )
+
+    serialized_item_copies = []
+    for item_copy in item_copies:
+        serialized_item_copies.append({
+            'item_id': item_copy.item_id,
+            'status': item_copy.status,
+            'id_copy': item_copy.id_copy,
+            'center': item_copy.center_id
+        })
+
+    return JsonResponse({'item_copies': serialized_item_copies})
+
+@api_view(['POST'])
+def advanced_search(request):
+    json_data = json.loads(request.body)
+    item_type = json_data.get('item_type')
+    search = json_data.get('search')
+    status = json_data.get('status')
+    center_id = json_data.get('center')
     
+    if center_id:
+        item_copies = ItemCopy.objects.filter(center_id=center_id)
+    else:
+        item_copies = ItemCopy.objects.all()
+
+    if item_type == 'llibre':
+        edition_date_start = json_data.get('edition_date_start')
+        edition_date_end = json_data.get('edition_date_end')
+        publisher = json_data.get('publisher')
+        language = json_data.get('language')
+
+        items = Book.objects.all()
+
+        if search:
+            items = items.filter(title__icontains=search)
+        if edition_date_start and edition_date_end:
+            items = items.filter(edition_date__range=(edition_date_start, edition_date_end))
+        if publisher:
+            items = items.filter(publisher=publisher)
+        if language:
+            items = items.filter(language=language)
+
+    elif item_type == 'cd':
+        edition_date_start = json_data.get('edition_date_start')
+        edition_date_end = json_data.get('edition_date_end')
+        discography = json_data.get('discography')
+        language = json_data.get('language')
+
+        items = CD.objects.all()
+
+        if search:
+            items = items.filter(title__icontains=search)
+        if edition_date_start and edition_date_end:
+            items = items.filter(edition_date__range=(edition_date_start, edition_date_end))
+        if discography:
+            items = items.filter(discography=discography)
+        if language:
+            items = items.filter(language=language)
+
+    elif item_type == 'dispositiu':
+        brand = json_data.get('brand')
+
+        items = Dispositive.objects.all()
+
+        if search:
+            items = items.filter(title__icontains=search)
+        if brand:
+            items = items.filter(brand=brand)
+    if status and status!= 'Indiferent':
+        item_copies = item_copies.filter(item__in=items, status=status)[:25]
+    else:
+        item_copies = item_copies.filter(item__in=items)[:25]
+    serialized_item_copies = []
+    for item_copy in item_copies:
+        serialized_item_copies.append({
+            'item_copy_id': item_copy.pk,
+            'status': item_copy.status,
+            'id_copy': item_copy.id_copy,
+            'center': item_copy.center_id,
+            'item_id':item_copy.item.pk,
+            'item_name':item_copy.item.title
+        })
+
+    return JsonResponse({'item_copies': serialized_item_copies})
+
+
+def get_centers(request):
+    centers = {}
+    for centre in Center.objects.all():
+        centers[centre.pk] = centre.name
+    return JsonResponse(centers)
+
+def get_publishers(request):
+    publishers = set()  
+    for book in Book.objects.all():
+        publishers.add(book.publisher)
+    
+    publishers_list = list(publishers)
+    
+    return JsonResponse({"publishers": publishers_list})
+
+def get_discographies(request):
+    discographies = set()  
+    for cd in CD.objects.all():
+        discographies.add(cd.discography)
+    
+    discographies_list = list(discographies)
+    
+    return JsonResponse({"discographies": discographies_list})
+
+
+def get_brands(request):
+    brands = set()  
+    for dispositive in Dispositive.objects.all():
+        brands.add(dispositive.brand)
+    
+    brands_list = list(brands)
+    
+    return JsonResponse({"brands": brands_list})

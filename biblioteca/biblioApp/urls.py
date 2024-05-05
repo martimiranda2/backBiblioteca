@@ -30,9 +30,17 @@ urlpatterns = [
     path('items/search/<idItem>/', views.obtain_item_data, name='obtain_item_data'),
     path('items/search-item-copies/<idItem>/', views.obtain_item_copies, name='obtain_item_copies'),
     path('items/search-availables/<search>/<page>/<page_size>/', views.search_items_availables_paginator, name='search_items_availables'),
-
+    path('items/search-advanced/', views.advanced_search, name='advanced_search'),
     path('items/make-loan/', views.make_loan, name='make_loan'),
-    
+
+    path('centers/get-centers/', views.get_centers, name='get_centers'),
+
+    path('books/get-publishers/', views.get_publishers, name='get_publishers'),
+
+    path('cds/get-discographies/', views.get_discographies, name='get_discographies'),
+
+    path('dispositives/get-brands/', views.get_brands, name='get_brands'),
+
     path('logs/save/', views.save_logs, name='save_log'),
     
 ]
