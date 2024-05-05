@@ -26,10 +26,10 @@ urlpatterns = [
     path('user/search/<email>', views.get_user_by_email, name='get_user_by_email'),
 
     path('items/autocompleat-search/<query>', views.autocomplete_search_items, name='search_5_items'),
-    path('items/search-items/<search>/', views.search_items, name='search_items'),
+    path('items/search-items/<search>/<page>/<page_size>/', views.search_items_pagination, name='search_items'),
     path('items/search/<idItem>/', views.obtain_item_data, name='obtain_item_data'),
     path('items/search-item-copies/<idItem>/', views.obtain_item_copies, name='obtain_item_copies'),
-    path('items/search-availables/<search>/', views.search_items_availables, name='search_items_availables'),
+    path('items/search-availables/<search>/<page>/<page_size>/', views.search_items_availables_paginator, name='search_items_availables'),
 
     path('items/make-loan/', views.make_loan, name='make_loan'),
     

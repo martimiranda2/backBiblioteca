@@ -1,4 +1,5 @@
 import json,base64,os,re
+from django.forms import model_to_dict
 from django.shortcuts import render, get_object_or_404
 from django.http import HttpResponse, JsonResponse
 from django.contrib.auth import authenticate, login
@@ -16,6 +17,7 @@ from django.core.files.base import ContentFile
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import validate_email
+from django.core.paginator import Paginator
 
 from rest_framework_simplejwt.tokens import RefreshToken, AccessToken
 from rest_framework.exceptions import AuthenticationFailed
@@ -226,25 +228,54 @@ def obtain_item_data(request,idItem):
         return JsonResponse({'error': 'Item does not exist'}, status=404)
 
 @csrf_exempt
-def search_items_availables(request, search):
-    query = search
-    print('search_items -> query:', query)
+def search_items_availables_paginator(request, search, page, page_size):
+    try:
+        query = search
+        page = int(page)
+        page_size = int(page_size)
 
-    results = []
+        InfoLog('', 'Query recived', f'Se ha recibido la query ({search}). Se buscarán solo los items disponibles que coincidan con la consulta.', '/search_items_availables_paginator')
 
-    models_to_search = [
-        (Item, ['title', 'material_type', 'signature'])
-    ]
+        results = []
 
-    for model, fields in models_to_search:
-        for field in fields:
-            filter_kwargs = {f"{field}__icontains": query}
-            model_results = model.objects.filter(**filter_kwargs)[:25]  # Limitar a 25 resultados
-            for obj in model_results:
-                if obj.loan_available:
-                    if ItemCopy.objects.filter(item=obj, status='Available').exists():
-                        results.append({'id': obj.id, 'name': str(obj)})
-    return JsonResponse(results, safe=False)
+        models_to_search = [
+            (Book, ['title', 'material_type', 'signature', 'author', 'edition_date', 'CDU', 'ISBN', 'publisher', 'colection', 'pages']),
+            (CD, ['title', 'material_type', 'signature', 'author', 'edition_date', 'discography', 'style', 'duration']),
+            (Dispositive, ['title', 'material_type', 'signature', 'brand', 'dispo_type'])
+        ]
+
+        for model, fields in models_to_search:
+            for field in fields:
+                filter_kwargs = {f"{field}__icontains": query}
+                model_results = model.objects.filter(**filter_kwargs).order_by('id')
+                
+                paginator = Paginator(model_results, page_size)
+                paginated_results = paginator.get_page(page)
+
+                for obj in paginated_results:
+                    if obj.loan_available:
+                        if ItemCopy.objects.filter(item=obj, status='Available').exists():
+                            available_copies = ItemCopy.objects.filter(item=obj, status='Available').count()
+                            item_dict = model_to_dict(obj)
+                            item_dict['item_type'] = model.__name__
+                            item_dict['available_copies'] = available_copies
+                            results.append(item_dict)
+        
+        if not results:
+            InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}', '/search_items_availables_paginator')
+            return JsonResponse({'error': 'No se encontraron resultados'}, status=404)
+        else:
+            InfoLog('', 'Get items', f'Se han obtenido {len(results)} items coincidentes con la consulta: {search}', '/search_items_availables_paginator')
+            return JsonResponse(results, safe=False, status=200)
+    
+    except ObjectDoesNotExist as e:
+        InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}. Error: {str(e)}', '/search_items_availables_paginator')
+        return JsonResponse({'error': 'Object does not exist'}, status=404)
+    
+    except Exception as e:
+        ErrorLog('', 'UNDEFINED ERROR', f'Error: {str(e)}', '/search_items_availables_paginator')
+        return JsonResponse({'error': 'An error occurred'}, status=500)
+
 
 @csrf_exempt
 def get_token_by_email_and_password(email, password):
@@ -879,7 +910,7 @@ def save_password(request):
             return JsonResponse({'message': 'User does not exist'}, status=404)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
-    
+
 @api_view(['GET'])
 def autocomplete_search_items(request, query):
     print('search_items -> query:', query)
@@ -899,23 +930,56 @@ def autocomplete_search_items(request, query):
     return JsonResponse(results, safe=False)
 
 @api_view(['GET'])
-def search_items(request, search):
-    query = search
-    print('search_items -> query:', query)
+def search_items_pagination(request, search, page, page_size):
+    try:
+        query = search
+        page = int(page)
+        page_size = int(page_size)
 
-    results = []
+        InfoLog('', 'Query recived', f'Se ha recibido la query ({search}). Se buscarán solo los items disponibles que coincidan con la consulta.', '/search_items_pagination')
 
-    models_to_search = [
-        (Item, ['title', 'material_type', 'signature'])
-    ]
+        results = []
 
-    for model, fields in models_to_search:
-        for field in fields:
-            filter_kwargs = {f"{field}__icontains": query}
-            model_results = model.objects.filter(**filter_kwargs)[:25]  # Limitar a 25 resultados
-            for obj in model_results:
-                results.append({'id': obj.id, 'name': str(obj)})
-    return JsonResponse(results, safe=False)
+        models_to_search = [
+            (Book, ['title', 'material_type', 'signature', 'author', 'edition_date', 'CDU', 'ISBN', 'publisher', 'colection', 'pages']),
+            (CD, ['title', 'material_type', 'signature', 'author', 'edition_date', 'discography', 'style', 'duration']),
+            (Dispositive, ['title', 'material_type', 'signature', 'brand', 'dispo_type'])
+        ]
+
+        for model, fields in models_to_search:
+            for field in fields:
+                filter_kwargs = {f"{field}__icontains": query}
+                model_results = model.objects.filter(**filter_kwargs).order_by('id')
+                
+                paginator = Paginator(model_results, page_size)
+                print('search_items_pagination -> paginator:', paginator)
+                print('search_items_pagination -> page:', page)
+                print('search_items_pagination -> page_size:', page_size)
+                paginated_results = paginator.get_page(page)
+
+                for obj in paginated_results:
+                    available_copies = ItemCopy.objects.filter(item=obj, status='Available').count()
+                    item_dict = model_to_dict(obj)
+                    item_dict['item_type'] = model.__name__
+                    item_dict['available_copies'] = available_copies
+                    results.append(item_dict)
+        
+        print('search_items ----------------> results:', results)
+        if not results:
+            InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}', '/search_items_pagination')
+            return JsonResponse({'error': 'No se encontraron resultados'}, status=404)
+        else:
+            InfoLog('', 'Get items', f'Se han obtenido {len(results)} items coincidentes con la consulta: {search}', '/search_items_pagination')
+            return JsonResponse(results, safe=False, status=200)
+    
+    except ObjectDoesNotExist as e:
+        InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}. Error: {str(e)}', '/search_items_pagination')
+        return JsonResponse({'error': 'Object does not exist'}, status=404)
+    
+    except Exception as e:
+        ErrorLog('', 'UNDEFINED ERROR', f'Error: {str(e)}', '/search_items_pagination')
+        return JsonResponse({'error': 'An error occurred'}, status=500)
+
 
 @api_view(['POST'])
 def save_csv(request):

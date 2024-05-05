@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
+from django.core.exceptions import ObjectDoesNotExist
 
 
 class Role(models.Model):
@@ -49,17 +50,11 @@ class UserProfile(models.Model):
     def __str__(self):
         return self.user.username
 
-
-
-
-
-
 class Item(models.Model):
     title = models.CharField(max_length=100 , verbose_name="Títol del item")    
     material_type = models.TextField(max_length=100, verbose_name="Material del que es composa")  
     signature = models.CharField(max_length=100, verbose_name="Signatura") 
     loan_available = models.BooleanField(default=True, verbose_name="Item disponible per prestar a alumnes")
-
 
     class Meta:
         verbose_name = "Item del catàlog"
@@ -68,9 +63,6 @@ class Item(models.Model):
 
     def __str__(self):
         return self.title
-
-
-
 
 class Book (Item):
     author = models.CharField(max_length=100 , verbose_name="Autor del item")
