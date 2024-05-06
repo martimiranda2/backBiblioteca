@@ -70,9 +70,10 @@ def show_users(request):
         userAdmin = UserProfile.objects.filter(email=email).first()
         if userAdmin is not None:
             rolAdmin = userAdmin.role.name
-            if rolAdmin == 'bibliotecari' or rolAdmin == 'admin' :
+            if rolAdmin == 'biblio' or rolAdmin == 'admin' :
+                print('User is admin')
                 center = userAdmin.center
-                users_alumne = UserProfile.objects.filter(role__name='alumne', center=center)
+                users_alumne = UserProfile.objects.filter(role__name='user', center=center)
                 user_profiles_json = list(users_alumne.values())
                 return JsonResponse({'user_profiles': user_profiles_json}, status=200)
                 
@@ -98,7 +99,7 @@ def change_user_data_admin(request):
             if user_admin is not None and user_change_obj is not None:
                 role_admin = user_admin.role.name
 
-                if role_admin == 'bibliotecari' or role_admin == 'admin':
+                if role_admin in ['biblio', 'admin']:
                     user_change = data.get('user_change')
 
                     if 'username' in user_change and user_change['username'] is not None:
@@ -390,7 +391,7 @@ def create_user(request):
                 return JsonResponse({'error': 'El usuario administrador no existe'}, status=404)
             
             rol_admin = user_admin.role.name
-            if rol_admin not in ['bibliotecari', 'admin']:
+            if rol_admin not in ['biblio', 'admin']:
                 return JsonResponse({'error': 'El usuario administrador no tiene permisos para crear usuarios'}, status=403)
             
             center = user_admin.center
@@ -989,7 +990,7 @@ def save_csv(request):
     userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
     center = userAdmin.center
     role = get_object_or_404(Role, name='user')
-    if userAdmin.role.name != 'bibliotecari' and userAdmin.role.name != 'admin':
+    if userAdmin.role not in ['biblio', 'admin']:
         ErrorLog(userAdmin.email, 'Invalid role', 'El rol del usuario admin no coincide con un bibliotecario o admin', '/save_csv')
         return JsonResponse({'error': 'email_admin no coincideix amb un usuari admin'}, status=400)
     user_profiles_data = json_data.get('user_profiles_csv', [])
