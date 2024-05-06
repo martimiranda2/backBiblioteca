@@ -382,7 +382,7 @@ def create_user(request):
                 'password': data.pop('password', None)
 
             }
-            role = Role.objects.get(name='alumne')
+            role = Role.objects.get(name='user')
             
             email_admin = data.get('email_admin')
             user_admin = UserProfile.objects.filter(email=email_admin).first()
@@ -988,7 +988,7 @@ def save_csv(request):
     json_data = json.loads(request.body)
     userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
     center = userAdmin.center
-    role = get_object_or_404(Role, name='alumne')
+    role = get_object_or_404(Role, name='user')
     if userAdmin.role.name != 'bibliotecari' and userAdmin.role.name != 'admin':
         ErrorLog(userAdmin.email, 'Invalid role', 'El rol del usuario admin no coincide con un bibliotecario o admin', '/save_csv')
         return JsonResponse({'error': 'email_admin no coincideix amb un usuari admin'}, status=400)
@@ -1069,7 +1069,7 @@ def save_csv(request):
                     errorsCount += 1
         
         InfoLog(userAdmin.email, 'CSV saved', f'Se ha procesado el CSV correctamente. Numero de usuarios guardados: {saves}. Número de registros erroneos: {errorsCount}', '/save_csv')
-        return JsonResponse({'saves': saves, 'errors': [str(error) for error in errors], 'errorsCount': errorsCount}, status=201)
+        return JsonResponse({'saves': saves, 'messages': [str(message) for message in messages], 'errorsCount': errorsCount}, status=201)
 
     else:
         ErrorLog(userAdmin.email, 'Method not allowed', 'Método no permitido en /save_csv. Debe ser POST', '/save_csv')

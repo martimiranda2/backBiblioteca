@@ -142,7 +142,7 @@ def create_users(num_users=100):
 
 
     cycles = ["1ESO","2ESO","3ESO","4ESO","1Bachillerat","2Bachillerat","Cicle Grau Mitjà Gestió administrativa", "Cicle Grau Mitjà Electromecànica de vehicles automòbils", "Cicle Grau Mitjà Mecanització","Cicle Grau Mitjà Manteniment electromecànic", "Cicle Grau Mitjà Sistemes microinformàtics i xarxes","Cicle Grau Superior Assistència a la direcció", "Cicle Grau Superior Administració i finances", "Cicle Grau Superior Automoció","Cicle Grau Superior Programació de la producció en fabricació mecànica","Cicle Grau Superior Mecatrònica industrial","Cicle Grau Superior Gestió de l'aigua","Cicle Grau Superior Desenvolupament d'aplicacions multiplataforma", "Cicle Grau Superior Desenvolupament d'aplicacions web"]
-    role = Role.objects.get(name="alumne")
+    role = Role.objects.get(name="user")
 
     center_name = "IES Esteve Terradas I Illa"
     center, created = Center.objects.get_or_create(name=center_name)
@@ -152,16 +152,14 @@ def create_users(num_users=100):
         name = fake.first_name()
         surname2 = fake.last_name() if random.choice([True, False]) else None
         while True:
-            username = fake.user_name()
-            if not User.objects.filter(username=username).exists():
-                break
-        dni_digits = ''.join([str(random.randint(0, 9)) for _ in range(8)])
-        dni_letter = 'TRWAGMYFPDXBNJZSQVHLCKE'[int(dni_digits) % 23]
-        dni = dni_digits + dni_letter
-        while True:
             email = fake.unique.email()
             if not User.objects.filter(email=email).exists():
                 break
+        username = email
+        dni_digits = ''.join([str(random.randint(0, 9)) for _ in range(8)])
+        dni_letter = 'TRWAGMYFPDXBNJZSQVHLCKE'[int(dni_digits) % 23]
+        dni = dni_digits + dni_letter
+        
         phone = fake.phone_number()
         password = fake.password()
         center = center
