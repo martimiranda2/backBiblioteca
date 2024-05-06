@@ -67,18 +67,29 @@ def show_users(request):
     if request.method == 'POST':
         data = json.loads(request.body)
         email = data.get('email_admin')
+        limite_pagina = data.get('limite_pagina')
+        page_number = data.get('numero_pagina')
         userAdmin = UserProfile.objects.filter(email=email).first()
         if userAdmin is not None:
             rolAdmin = userAdmin.role.name
-            if rolAdmin == 'bibliotecari' or rolAdmin == 'admin' :
+            if rolAdmin == 'biblio' or rolAdmin == 'admin':
                 center = userAdmin.center
                 users_alumne = UserProfile.objects.filter(role__name='alumne', center=center)
-                user_profiles_json = list(users_alumne.values())
-                return JsonResponse({'user_profiles': user_profiles_json}, status=200)
+                
+            
+                paginator = Paginator(users_alumne, limite_pagina)  
+                page_obj = paginator.get_page(page_number)
+
+                user_profiles_json = list(page_obj.object_list.values())
+                return JsonResponse({'user_profiles': user_profiles_json, 'total_pages': paginator.num_pages}, status=200)
                 
             else:
+                ErrorLog(userAdmin, 'Admin not found', f'Usuario administrador no encontrado con el email {userAdmin}', '/show-users')
+
                 return JsonResponse({'error': 'User is not an admin'}, status=400)
         else:
+            ErrorLog(userAdmin, 'User not found', f'Usuario  no encontrado con el email {userAdmin}', '/show-users')
+
             return JsonResponse({'error': 'User not exist'}, status=400)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
@@ -98,7 +109,7 @@ def change_user_data_admin(request):
             if user_admin is not None and user_change_obj is not None:
                 role_admin = user_admin.role.name
 
-                if role_admin == 'bibliotecari' or role_admin == 'admin':
+                if role_admin == 'biblio' or role_admin == 'admin':
                     user_change = data.get('user_change')
 
                     if 'username' in user_change and user_change['username'] is not None:
@@ -230,44 +241,45 @@ def obtain_item_data(request,idItem):
 @csrf_exempt
 def search_items_availables_paginator(request, search, page, page_size):
     try:
-        query = search
+        # Convertir la página y el tamaño de página en enteros
         page = int(page)
         page_size = int(page_size)
 
-        InfoLog('', 'Query recived', f'Se ha recibido la query ({search}). Se buscarán solo los items disponibles que coincidan con la consulta.', '/search_items_availables_paginator')
+        InfoLog('', 'Query received', f'Se ha recibido la query ({search}). Se buscarán solo los items disponibles que coincidan con la consulta.', '/search_items_availables_paginator')
 
-        results = []
+        results_set = set()  # Usamos un conjunto para evitar duplicados
 
         models_to_search = [
-            (Book, ['title', 'material_type', 'signature', 'author', 'edition_date', 'CDU', 'ISBN', 'publisher', 'colection', 'pages']),
+            (Book, ['title', 'material_type', 'signature', 'author', 'edition_date', 'CDU', 'ISBN', 'publisher', 'collection', 'pages']),
             (CD, ['title', 'material_type', 'signature', 'author', 'edition_date', 'discography', 'style', 'duration']),
             (Dispositive, ['title', 'material_type', 'signature', 'brand', 'dispo_type'])
         ]
 
         for model, fields in models_to_search:
             for field in fields:
-                filter_kwargs = {f"{field}__icontains": query}
-                model_results = model.objects.filter(**filter_kwargs).order_by('id')
-                
-                paginator = Paginator(model_results, page_size)
-                paginated_results = paginator.get_page(page)
+                filter_kwargs = {f"{field}__icontains": search}
+                model_results = model.objects.filter(**filter_kwargs, loan_available=True, itemcopy__status='Available').distinct().order_by('id')
+                results_set.update(model_results)  # Agregamos los resultados al conjunto
 
-                for obj in paginated_results:
-                    if obj.loan_available:
-                        if ItemCopy.objects.filter(item=obj, status='Available').exists():
-                            available_copies = ItemCopy.objects.filter(item=obj, status='Available').count()
-                            item_dict = model_to_dict(obj)
-                            item_dict['item_type'] = model.__name__
-                            item_dict['available_copies'] = available_copies
-                            results.append(item_dict)
-        
+        results = list(results_set)  # Convertimos el conjunto en una lista
+
         if not results:
             InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}', '/search_items_availables_paginator')
             return JsonResponse({'error': 'No se encontraron resultados'}, status=404)
-        else:
-            InfoLog('', 'Get items', f'Se han obtenido {len(results)} items coincidentes con la consulta: {search}', '/search_items_availables_paginator')
-            return JsonResponse(results, safe=False, status=200)
-    
+
+        paginator = Paginator(results, page_size)
+        paginated_results = paginator.get_page(page)
+
+        serialized_results = []
+        for obj in paginated_results:
+            item_dict = model_to_dict(obj)
+            item_dict['item_type'] = obj.__class__.__name__
+            item_dict['available_copies'] = obj.itemcopy_set.filter(status='Available').count()
+            serialized_results.append(item_dict)
+
+        InfoLog('', 'Get items', f'Se han obtenido {len(serialized_results)} items coincidentes con la consulta: {search}', '/search_items_availables_paginator')
+        return JsonResponse(serialized_results, safe=False, status=200)
+
     except ObjectDoesNotExist as e:
         InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}. Error: {str(e)}', '/search_items_availables_paginator')
         return JsonResponse({'error': 'Object does not exist'}, status=404)
@@ -275,6 +287,7 @@ def search_items_availables_paginator(request, search, page, page_size):
     except Exception as e:
         ErrorLog('', 'UNDEFINED ERROR', f'Error: {str(e)}', '/search_items_availables_paginator')
         return JsonResponse({'error': 'An error occurred'}, status=500)
+
 
 
 @csrf_exempt
@@ -390,7 +403,7 @@ def create_user(request):
                 return JsonResponse({'error': 'El usuario administrador no existe'}, status=404)
             
             rol_admin = user_admin.role.name
-            if rol_admin not in ['bibliotecari', 'admin']:
+            if rol_admin not in ['biblio', 'admin']:
                 return JsonResponse({'error': 'El usuario administrador no tiene permisos para crear usuarios'}, status=403)
             
             center = user_admin.center
@@ -989,8 +1002,8 @@ def save_csv(request):
     userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
     center = userAdmin.center
     role = get_object_or_404(Role, name='user')
-    if userAdmin.role.name != 'bibliotecari' and userAdmin.role.name != 'admin':
-        ErrorLog(userAdmin.email, 'Invalid role', 'El rol del usuario admin no coincide con un bibliotecario o admin', '/save_csv')
+    if userAdmin.role.name != 'biblio' and userAdmin.role.name != 'admin':
+        ErrorLog(userAdmin.email, 'Invalid role', 'El rol del usuario admin no coincide con un biblioo o admin', '/save_csv')
         return JsonResponse({'error': 'email_admin no coincideix amb un usuari admin'}, status=400)
     user_profiles_data = json_data.get('user_profiles_csv', [])
     messages = []
@@ -1300,3 +1313,52 @@ def get_brands(request):
     brands_list = list(brands)
     
     return JsonResponse({"brands": brands_list})
+
+def create_item(request):
+    if request.method == 'POST':
+        data = json.loads(request.body)
+        item_type = data.get('item_type')
+
+        if item_type == 'Book':
+            item = Book.objects.create(
+                title=data.get('title'),
+                material_type='Paper',
+                signature=data.get('signature'),
+                loan_available=data.get('loan_available'),
+                author=data.get('author', None),
+                edition_date=data.get('edition_date', None),
+                CDU=data.get('CDU', None),
+                ISBN=data.get('ISBN', None),
+                publisher=data.get('publisher', None),
+                collection=data.get('collection', None),
+                pages=data.get('pages', None),
+                language=data.get('language', None)
+            )
+        elif item_type == 'CD':
+            item = CD.objects.create(
+                title=data.get('title'),
+                material_type=data.get('material_type'),
+                signature=data.get('signature'),
+                loan_available=data.get('loan_available'),
+                author=data.get('author', None),
+                edition_date=data.get('edition_date', None),
+                discography=data.get('discography', None),
+                style=data.get('style', None),
+                duration=data.get('duration', None),
+                language=data.get('language', None)
+            )
+        elif item_type == 'Dispositive':
+            item = Dispositive.objects.create(
+                title=data.get('title'),
+                material_type=data.get('material_type'),
+                signature=data.get('signature'),
+                loan_available=data.get('loan_available'),
+                brand=data.get('brand', None),
+                dispo_type=data.get('dispo_type', None)
+            )
+        else:
+            return JsonResponse({'error': 'Invalid item type'}, status=400)
+
+        return JsonResponse({'message': f'{item_type} created successfully'}, status=201)
+    else:
+        return JsonResponse({'error': 'Method not allowed'}, status=405)
