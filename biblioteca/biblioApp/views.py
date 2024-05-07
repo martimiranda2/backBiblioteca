@@ -74,8 +74,7 @@ def show_users(request):
             rolAdmin = userAdmin.role.name
             if rolAdmin == 'biblio' or rolAdmin == 'admin':
                 center = userAdmin.center
-                users_alumne = UserProfile.objects.filter(role__name='alumne', center=center)
-                
+                users_alumne = UserProfile.objects.filter(role__name='user', center=center)
             
                 paginator = Paginator(users_alumne, limite_pagina)  
                 page_obj = paginator.get_page(page_number)
@@ -109,7 +108,7 @@ def change_user_data_admin(request):
             if user_admin is not None and user_change_obj is not None:
                 role_admin = user_admin.role.name
 
-                if role_admin == 'biblio' or role_admin == 'admin':
+                if role_admin == 'bibliotecari' or role_admin == 'admin':
                     user_change = data.get('user_change')
 
                     if 'username' in user_change and user_change['username'] is not None:
@@ -1002,8 +1001,8 @@ def save_csv(request):
     userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
     center = userAdmin.center
     role = get_object_or_404(Role, name='user')
-    if userAdmin.role.name != 'biblio' and userAdmin.role.name != 'admin':
-        ErrorLog(userAdmin.email, 'Invalid role', 'El rol del usuario admin no coincide con un biblioo o admin', '/save_csv')
+    if userAdmin.role not in ['biblio', 'admin']:
+        ErrorLog(userAdmin.email, 'Invalid role', 'El rol del usuario admin no coincide con un bibliotecario o admin', '/save_csv')
         return JsonResponse({'error': 'email_admin no coincideix amb un usuari admin'}, status=400)
     user_profiles_data = json_data.get('user_profiles_csv', [])
     messages = []
