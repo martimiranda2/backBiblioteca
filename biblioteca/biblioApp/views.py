@@ -1314,31 +1314,46 @@ def get_brands(request):
     
     return JsonResponse({"brands": brands_list})
 
+@api_view(['POST'])
 def create_item(request):
     if request.method == 'POST':
         data = json.loads(request.body)
         item_type = data.get('item_type')
+        title = data.get('title', '')
+        author = data.get('author', '')
+
+        if len(title) >= 3:
+            first_three_title = title[:3]
+        else:
+            first_three_title = title
+
+        if len(author) >= 3:
+            first_three_author = author[:3]
+        else:
+            first_three_author = author
+
+        signature = f"{first_three_title.upper()}{first_three_author.upper()}"
 
         if item_type == 'Book':
             item = Book.objects.create(
                 title=data.get('title'),
                 material_type='Paper',
-                signature=data.get('signature'),
+                signature=signature,
                 loan_available=data.get('loan_available'),
                 author=data.get('author', None),
                 edition_date=data.get('edition_date', None),
                 CDU=data.get('CDU', None),
                 ISBN=data.get('ISBN', None),
                 publisher=data.get('publisher', None),
-                collection=data.get('collection', None),
+                colection=data.get('collection', None),
                 pages=data.get('pages', None),
                 language=data.get('language', None)
             )
         elif item_type == 'CD':
             item = CD.objects.create(
                 title=data.get('title'),
-                material_type=data.get('material_type'),
-                signature=data.get('signature'),
+                material_type='Plàstic',
+                signature=signature,
                 loan_available=data.get('loan_available'),
                 author=data.get('author', None),
                 edition_date=data.get('edition_date', None),
@@ -1350,8 +1365,8 @@ def create_item(request):
         elif item_type == 'Dispositive':
             item = Dispositive.objects.create(
                 title=data.get('title'),
-                material_type=data.get('material_type'),
-                signature=data.get('signature'),
+                material_type='Plàstic',
+                signature=signature,
                 loan_available=data.get('loan_available'),
                 brand=data.get('brand', None),
                 dispo_type=data.get('dispo_type', None)

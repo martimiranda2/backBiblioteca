@@ -32,7 +32,8 @@ urlpatterns = [
     path('items/search-availables/<search>/<page>/<page_size>/', views.search_items_availables_paginator, name='search_items_availables'),
     path('items/search-advanced/', views.advanced_search, name='advanced_search'),
     path('items/make-loan/', views.make_loan, name='make_loan'),
-
+    path('items/create-item/', views.create_item, name='create_item'),
+    
     path('centers/get-centers/', views.get_centers, name='get_centers'),
 
     path('books/get-publishers/', views.get_publishers, name='get_publishers'),
