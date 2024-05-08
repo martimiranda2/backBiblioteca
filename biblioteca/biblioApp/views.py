@@ -62,6 +62,28 @@ def get_user_image(request, user_id):
         
         return JsonResponse({'error': 'Only GET requests are allowed'}, status=400)
 
+@api_view(['GET'])
+def get_count_users(request):
+    try:
+        if request.method == 'GET':
+            userId = request.GET.get('userId')
+            userAdmin = UserProfile.objects.filter(id=userId).first()
+
+            if userAdmin is not None:
+                rolAdmin = userAdmin.role.name
+                if rolAdmin == 'biblio' or rolAdmin == 'admin':
+                    center = userAdmin.center
+                    total_users = UserProfile.objects.filter(role__name='user', center=center).count()
+                    return JsonResponse({'total_users': total_users}, status=200)
+                else:
+                    return JsonResponse({'error': 'User not authorized (no role)'}, status=403)
+            else:
+                return JsonResponse({'error': 'User not authorized (no userAdmin)'}, status=403)
+        else:
+            return JsonResponse({'error': 'Method not allowed'}, status=405)
+    except Exception as error:
+        return JsonResponse({'error': f'An error occurred #ERROR - {error}'}, status=500)
+
 @api_view(['POST'])
 def show_users(request):
     if request.method == 'POST':
@@ -92,6 +114,26 @@ def show_users(request):
             return JsonResponse({'error': 'User not exist'}, status=400)
     else:
         return JsonResponse({'error': 'Method not allowed'}, status=405)
+    
+
+@api_view(['GET'])
+def get_users_by_userId(request, userId):
+    try:
+        userAdmin = UserProfile.objects.get(id=userId)
+        if userAdmin is None:
+            return JsonResponse({'error': 'User not found'}, status=404)
+        
+        rolAdmin = userAdmin.role.name
+        if rolAdmin not in ['biblio', 'admin']:
+            return JsonResponse({'error': 'User is not an admin'}, status=403)
+        
+        center = userAdmin.center
+        users_alumne = UserProfile.objects.filter(role__name='user', center=center)
+        return JsonResponse({'users': list(users_alumne.values())}, status=200)
+        
+    except Exception as error:
+        return JsonResponse({'error': f'An error occurred: {error}'}, status=500)
+
 
 @api_view(['POST'])
 def change_user_data_admin(request):
@@ -108,7 +150,7 @@ def change_user_data_admin(request):
             if user_admin is not None and user_change_obj is not None:
                 role_admin = user_admin.role.name
 
-                if role_admin == 'bibliotecari' or role_admin == 'admin':
+                if role_admin == 'biblio' or role_admin == 'admin':
                     user_change = data.get('user_change')
 
                     if 'username' in user_change and user_change['username'] is not None:
@@ -236,6 +278,49 @@ def obtain_item_data(request,idItem):
     
     except Item.DoesNotExist:
         return JsonResponse({'error': 'Item does not exist'}, status=404)
+
+
+@api_view(['GET'])
+def search_items_availables(request, search):
+    try:
+        query = search
+        InfoLog('', 'Query recived', f'Se ha recibido la query ({search}). Se buscarán solo los items disponibles que coincidan con la consulta.', '/search_items_pagination')
+
+        results = []
+
+        models_to_search = [
+            (Book, ['title', 'material_type', 'signature', 'author', 'edition_date', 'CDU', 'ISBN', 'publisher', 'colection', 'pages']),
+            (CD, ['title', 'material_type', 'signature', 'author', 'edition_date', 'discography', 'style', 'duration']),
+            (Dispositive, ['title', 'material_type', 'signature', 'brand', 'dispo_type'])
+        ]
+
+        for model, fields in models_to_search:
+            for field in fields:
+                filter_kwargs = {f"{field}__icontains": query}
+                model_results = model.objects.filter(**filter_kwargs, loan_available=True, itemcopy__status='Available').distinct().order_by('id')
+                
+                for obj in model_results:
+                    available_copies = ItemCopy.objects.filter(item=obj, status='Available').count()
+                    item_dict = model_to_dict(obj)
+                    item_dict['item_type'] = model.__name__
+                    item_dict['available_copies'] = available_copies
+                    results.append(item_dict)
+        
+        if not results:
+            InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}', '/search_items_pagination')
+            return JsonResponse({'error': 'No se encontraron resultados'}, status=404)
+        else:
+            InfoLog('', 'Get items', f'Se han obtenido {len(results)} items coincidentes con la consulta: {search}', '/search_items_pagination')
+            return JsonResponse(results, safe=False, status=200)
+    
+    except ObjectDoesNotExist as e:
+        InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}. Error: {str(e)}', '/search_items_pagination')
+        return JsonResponse({'error': 'Object does not exist'}, status=404)
+    
+    except Exception as e:
+        ErrorLog('', 'UNDEFINED ERROR', f'Error: {str(e)}', '/search_items_pagination')
+        return JsonResponse({'error': 'An error occurred'}, status=500)
+    
 
 @csrf_exempt
 def search_items_availables_paginator(request, search, page, page_size):
@@ -940,6 +1025,47 @@ def autocomplete_search_items(request, query):
             for obj in model_results:
                 results.append({'id': obj.id, 'name': str(obj)})
     return JsonResponse(results, safe=False)
+
+@api_view(['GET'])
+def search_items(request, search):
+    try:
+        query = search
+        InfoLog('', 'Query recived', f'Se ha recibido la query ({search}). Se buscarán solo los items disponibles que coincidan con la consulta.', '/search_items_pagination')
+
+        results = []
+
+        models_to_search = [
+            (Book, ['title', 'material_type', 'signature', 'author', 'edition_date', 'CDU', 'ISBN', 'publisher', 'colection', 'pages']),
+            (CD, ['title', 'material_type', 'signature', 'author', 'edition_date', 'discography', 'style', 'duration']),
+            (Dispositive, ['title', 'material_type', 'signature', 'brand', 'dispo_type'])
+        ]
+
+        for model, fields in models_to_search:
+            for field in fields:
+                filter_kwargs = {f"{field}__icontains": query}
+                model_results = model.objects.filter(**filter_kwargs).order_by('id')
+                
+                for obj in model_results:
+                    available_copies = ItemCopy.objects.filter(item=obj, status='Available').count()
+                    item_dict = model_to_dict(obj)
+                    item_dict['item_type'] = model.__name__
+                    item_dict['available_copies'] = available_copies
+                    results.append(item_dict)
+        
+        if not results:
+            InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}', '/search_items_pagination')
+            return JsonResponse({'error': 'No se encontraron resultados'}, status=404)
+        else:
+            InfoLog('', 'Get items', f'Se han obtenido {len(results)} items coincidentes con la consulta: {search}', '/search_items_pagination')
+            return JsonResponse(results, safe=False, status=200)
+    
+    except ObjectDoesNotExist as e:
+        InfoLog('', 'Object does not exist', f'No se ha encontrado ningún objeto coincidente con la consulta: {search}. Error: {str(e)}', '/search_items_pagination')
+        return JsonResponse({'error': 'Object does not exist'}, status=404)
+    
+    except Exception as e:
+        ErrorLog('', 'UNDEFINED ERROR', f'Error: {str(e)}', '/search_items_pagination')
+        return JsonResponse({'error': 'An error occurred'}, status=500)
 
 @api_view(['GET'])
 def search_items_pagination(request, search, page, page_size):
