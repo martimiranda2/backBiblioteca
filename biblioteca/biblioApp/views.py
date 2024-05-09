@@ -1125,9 +1125,10 @@ def save_csv(request):
     errorsCount = 0
     json_data = json.loads(request.body)
     userAdmin = get_object_or_404(UserProfile, email=json_data.get('email_admin'))
+
     center = userAdmin.center
     role = get_object_or_404(Role, name='user')
-    if userAdmin.role not in ['biblio', 'admin']:
+    if userAdmin.role.name not in ['biblio', 'admin']:
         ErrorLog(userAdmin.email, 'Invalid role', 'El rol del usuario admin no coincide con un bibliotecario o admin', '/save_csv')
         return JsonResponse({'error': 'email_admin no coincideix amb un usuari admin'}, status=400)
     user_profiles_data = json_data.get('user_profiles_csv', [])
