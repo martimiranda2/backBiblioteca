@@ -1389,9 +1389,9 @@ def advanced_search(request):
         if brand:
             items = items.filter(brand=brand)
     if status and status!= 'Indiferent':
-        item_copies = item_copies.filter(item__in=items, status=status)[:25]
+        item_copies = item_copies.filter(item__in=items, status=status)
     else:
-        item_copies = item_copies.filter(item__in=items)[:25]
+        item_copies = item_copies.filter(item__in=items)
     serialized_item_copies = []
     for item_copy in item_copies:
         serialized_item_copies.append({
@@ -1400,7 +1400,8 @@ def advanced_search(request):
             'id_copy': item_copy.id_copy,
             'center': item_copy.center_id,
             'item_id':item_copy.item.pk,
-            'item_name':item_copy.item.title
+            'item_name':item_copy.item.title,
+            'item_type': item_type,
         })
 
     return JsonResponse({'item_copies': serialized_item_copies})
